@@ -5,7 +5,7 @@ Réinitialisation de Données PrestaShop
 ## Setup & Architecture
 
 - [x] Configurer les variables d'environnement (URL de l'API PS, clé API, etc.)
-- [ ] Mettre en place l'authentification vers l'API PrestaShop (Basic Auth / API Key)
+- [x] Mettre en place l'authentification vers l'API PrestaShop (Basic Auth / API Key)
 
 ---
 
@@ -22,10 +22,10 @@ Réinitialisation de Données PrestaShop
 
 - [x] Créer la page/composant principal "Réinitialisation"
 - [x] Afficher la liste des ressources récupérées dynamiquement
-- [ ] Ajouter une checkbox par ressource
-- [ ] Ajouter un bouton **Tout sélectionner / Tout désélectionner**
-- [ ] Désactiver le bouton "Supprimer" si aucune ressource cochée
-- [ ] Ajouter un indicateur de chargement pendant la récupération de la liste
+- [x] Ajouter une checkbox par ressource
+- [x] Ajouter un bouton **Tout sélectionner / Tout désélectionner**
+- [x] Désactiver le bouton "Supprimer" si aucune ressource cochée
+- [x] Ajouter un indicateur de chargement pendant la récupération de la liste
 
 ---
 
