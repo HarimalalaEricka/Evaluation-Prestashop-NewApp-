@@ -20,8 +20,8 @@ Réinitialisation de Données PrestaShop
 
 ## UI — Affichage & Sélection
 
-- [ ] Créer la page/composant principal "Réinitialisation"
-- [ ] Afficher la liste des ressources récupérées dynamiquement
+- [x] Créer la page/composant principal "Réinitialisation"
+- [x] Afficher la liste des ressources récupérées dynamiquement
 - [ ] Ajouter une checkbox par ressource
 - [ ] Ajouter un bouton **Tout sélectionner / Tout désélectionner**
 - [ ] Désactiver le bouton "Supprimer" si aucune ressource cochée
