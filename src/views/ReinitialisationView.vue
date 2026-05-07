@@ -9,34 +9,34 @@ const errorMessage = ref('')
 const allselected = ref(false)
 
 function toggleRessource(name) {
-  const nextSelection = new Set(selectedRessources.value)
+    const nextSelection = new Set(selectedRessources.value)
 
-  if (nextSelection.has(name)) {
-    nextSelection.delete(name)
-  } else {
-    nextSelection.add(name)
-  }
+    if (nextSelection.has(name)) {
+        nextSelection.delete(name)
+    } else {
+        nextSelection.add(name)
+    }
 
-  selectedRessources.value = nextSelection
+    selectedRessources.value = nextSelection
 }
 
 function SelectAll() {
-  if (allselected.value) {
-    selectedRessources.value = new Set()
-  } else {
-    selectedRessources.value = new Set(ressources.value.map(item => item.name))
-  }
-  allselected.value = !allselected.value
-}
+    if (allselected.value) {
+        selectedRessources.value = new Set()
+    } else {
+        selectedRessources.value = new Set(ressources.value.map(item => item.name))
+    }
+    allselected.value = !allselected.value
+    }
 
 onMounted(async () => {
-  try {
-    ressources.value = await getRessources()
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Erreur inattendue'
-  } finally {
-    isLoading.value = false
-  }
+    try {
+        ressources.value = await getRessources()
+    } catch (error) {
+        errorMessage.value = error instanceof Error ? error.message : 'Erreur inattendue'
+    } finally {
+        isLoading.value = false
+    }
 })
 </script>
 

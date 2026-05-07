@@ -31,8 +31,8 @@ Réinitialisation de Données PrestaShop
 
 ## API — Suppression des données
 
-- [ ] Créer un service/fonction `deleteResourceData(resourceName)`
-- [ ] Implémenter la logique pour récupérer les IDs de chaque ressource sélectionnée
+- [x] Créer un service/fonction `deleteResourceData(resourceName)`
+- [x] Implémenter la logique pour récupérer les IDs de chaque ressource sélectionnée
 - [ ] Appeler l'endpoint de suppression pour chaque item de chaque ressource
 - [ ] Gérer la suppression en batch ou séquentielle (éviter de surcharger l'API)
 - [ ] Gérer les erreurs par ressource (certaines peuvent échouer, d'autres réussir)
