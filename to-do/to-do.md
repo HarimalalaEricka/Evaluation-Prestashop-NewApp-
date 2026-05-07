@@ -13,7 +13,7 @@ Réinitialisation de Données PrestaShop
 
 - [x] Identifier l'endpoint PrestaShop qui liste toutes les ressources disponibles (`/api/` retourne la liste)
 - [x] Créer un service/fonction `getResources()` qui appelle cet endpoint
-- [ ] Parser la réponse pour extraire les noms et URLs de chaque ressource
+- [x] Parser la réponse pour extraire les noms et URLs de chaque ressource
 - [ ] Gérer les erreurs (timeout, auth échouée, ressource inaccessible)
 
 ---
