@@ -33,18 +33,17 @@ Réinitialisation de Données PrestaShop
 
 - [x] Créer un service/fonction `deleteResourceData(resourceName)`
 - [x] Implémenter la logique pour récupérer les IDs de chaque ressource sélectionnée
-- [ ] Appeler l'endpoint de suppression pour chaque item de chaque ressource
-- [ ] Gérer la suppression en batch ou séquentielle (éviter de surcharger l'API)
-- [ ] Gérer les erreurs par ressource (certaines peuvent échouer, d'autres réussir)
+- [x] Appeler l'endpoint de suppression pour chaque item de chaque ressource
+- [x] Gérer la suppression en batch ou séquentielle (éviter de surcharger l'API)
+- [x] Gérer les erreurs par ressource (certaines peuvent échouer, d'autres réussir)
 
 ---
 
 ## UX — Confirmation & Feedback
 
-- [ ] Ajouter une **modale de confirmation** avant la suppression ("Êtes-vous sûr ?")
-- [ ] Afficher une barre de progression pendant la suppression
-- [ ] Afficher un rapport de résultat après (succès / échecs par ressource)
-- [ ] Notifier l'utilisateur en cas d'erreur partielle
+- [x] Ajouter une **modale de confirmation** avant la suppression ("Êtes-vous sûr ?")
+- [x] Afficher un rapport de résultat après (succès / échecs par ressource)
+- [x] Notifier l'utilisateur en cas d'erreur partielle
 
 ---
 

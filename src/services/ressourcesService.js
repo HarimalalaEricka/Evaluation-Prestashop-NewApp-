@@ -21,14 +21,39 @@ function getResourceUrl(resourceElement) {
     )
 }
 
-function parseResourcesFromXml(xmlDoc, tagname) {
-    const apiNode = xmlDoc.getElementsByTagName(tagname)[0]
+function singularizeResourceName(pluralName) {
+    // ies → y (categories → category)
+    if (pluralName.endsWith('ies')) {
+        return pluralName.slice(0, -3) + 'y'
+    }
 
-    if (!apiNode) {
+    // es → (addresses → address)
+    if (pluralName.endsWith('es')) {
+        return pluralName.slice(0, -2)
+    }
+
+    // s → (products → product)
+    if (pluralName.endsWith('s')) {
+        return pluralName.slice(0, -1)
+    }
+
+    return pluralName
+}
+
+function parseResourcesFromXml(xmlDoc, containerTagName, itemTagName = null) {
+    const containerNode = xmlDoc.getElementsByTagName(containerTagName)[0]
+
+    if (!containerNode) {
         return []
     }
 
-    return Array.from(apiNode.children)
+    // Si itemTagName est fourni, chercher les enfants de ce nom
+    // Sinon, prendre tous les enfants directs sauf script/description/schema
+    const childrenToProcess = itemTagName
+        ? Array.from(containerNode.getElementsByTagName(itemTagName))
+        : Array.from(containerNode.children)
+
+    return childrenToProcess
         .filter((resourceElement) => resourceElement.tagName !== 'description' && resourceElement.tagName !== 'schema' && resourceElement.tagName !== 'script')
         .map((resourceElement) => ({
         name: resourceElement.tagName,
@@ -120,7 +145,10 @@ export async function getRessourceData(ressourceName) {
         throw new Error('Erreur parsing XML')
     }
 
-    return parseResourcesFromXml(xmlDoc, 'prestashop')
+    // Singulariser le nom de ressource (categories → category, products → product, etc)
+    const itemTagName = singularizeResourceName(ressourceName)
+
+    return parseResourcesFromXml(xmlDoc, 'prestashop', itemTagName)
 }
 
 export async function deleteResource(resourceName, id) {
@@ -153,7 +181,10 @@ export async function deleteResource(resourceName, id) {
     }
 }
 
-export async function deleteAllResourceData(resourceName) {
+export async function deleteAllResourceData(resourceName, options = {}) {
+    // Options: { delayBetweenRequests: ms, batchSize: n }
+    const { delayBetweenRequests = 500, batchSize = 1 } = options
+
     // Récupérer tous les items de la ressource
     const items = await getRessourceData(resourceName)
 
@@ -166,25 +197,50 @@ export async function deleteAllResourceData(resourceName) {
 
     const errors = []
     const deleted = []
+    const results = {
+        resource: resourceName,
+        deleted,
+        errors,
+        deletedCount: 0,
+        errorCount: 0,
+        totalCount: ids.length,
+    }
 
-    // Boucler et supprimer chaque item
-    for (const id of ids) {
-        try {
-            await deleteResource(resourceName, id)
-            deleted.push(id)
-        } catch (error) {
-            errors.push({
-                id,
-                message: error instanceof Error ? error.message : String(error),
-            })
+    // Fonction utilitaire pour attendre
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+    // Traiter en batches
+    for (let i = 0; i < ids.length; i += batchSize) {
+        const batch = ids.slice(i, i + batchSize)
+
+        // Lancer les suppressions du batch en parallèle
+        const promises = batch.map(async (id) => {
+            try {
+                await deleteResource(resourceName, id)
+                deleted.push(id)
+                return { id, success: true }
+            } catch (error) {
+                const errorMsg = error instanceof Error ? error.message : String(error)
+                errors.push({
+                    id,
+                    message: errorMsg,
+                    timestamp: new Date().toISOString(),
+                })
+                return { id, success: false, error: errorMsg }
+            }
+        })
+
+        await Promise.all(promises)
+
+        // Attendre avant le prochain batch (sauf le dernier)
+        if (i + batchSize < ids.length && delayBetweenRequests > 0) {
+            await sleep(delayBetweenRequests)
         }
     }
 
-    return {
-        deleted,
-        errors,
-        deletedCount: deleted.length,
-        errorCount: errors.length,
-    }
+    results.deletedCount = deleted.length
+    results.errorCount = errors.length
+
+    return results
 }
 
