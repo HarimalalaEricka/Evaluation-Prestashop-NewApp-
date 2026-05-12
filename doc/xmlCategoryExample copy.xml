@@ -1,0 +1,233 @@
+<?xml version="1.0" encoding="UTF-8"?>
+            <prestashop xmlns:xlink="http://www.w3.org/1999/xlink">
+            <categorie>
+            <ID>
+            <![CDATA[20]]>
+            </ID>
+            
+            <Actif(0/1)>
+            <![CDATA[1]]>
+            </Actif(0/1)>
+            
+            <Nom*>
+            <![CDATA[Smartphones]]>
+            </Nom*>
+            </categorie><categorie>
+            <ID>
+            <![CDATA[21]]>
+            </ID>
+            
+            <Actif(0/1)>
+            <![CDATA[1]]>
+            </Actif(0/1)>
+            
+            <Nom*>
+            <![CDATA[Audio]]>
+            </Nom*>
+            </categorie><categorie>
+            <ID>
+            <![CDATA[22]]>
+            </ID>
+            
+            <Actif(0/1)>
+            <![CDATA[1]]>
+            </Actif(0/1)>
+            
+            <Nom*>
+            <![CDATA[Monitors]]>
+            </Nom*>
+            </categorie><categorie>
+            <ID>
+            <![CDATA[23]]>
+            </ID>
+            
+            <Actif(0/1)>
+            <![CDATA[1]]>
+            </Actif(0/1)>
+            
+            <Nom*>
+            <![CDATA[Storage]]>
+            </Nom*>
+            </categorie><categorie>
+            <ID>
+            <![CDATA[24]]>
+            </ID>
+            
+            <Actif(0/1)>
+            <![CDATA[1]]>
+            </Actif(0/1)>
+            
+            <Nom*>
+            <![CDATA[Furniture]]>
+            </Nom*>
+            </categorie><categorie>
+            <ID>
+            <![CDATA[25]]>
+            </ID>
+            
+            <Actif(0/1)>
+            <![CDATA[1]]>
+            </Actif(0/1)>
+            
+            <Nom*>
+            <![CDATA[Networking]]>
+            </Nom*>
+            </categorie><categorie>
+            <ID>
+            <![CDATA[26]]>
+            </ID>
+            
+            <Actif(0/1)>
+            <![CDATA[1]]>
+            </Actif(0/1)>
+            
+            <Nom*>
+            <![CDATA[Wearables]]>
+            </Nom*>
+            </categorie><categorie>
+            <ID>
+            <![CDATA[27]]>
+            </ID>
+            
+            <Actif(0/1)>
+            <![CDATA[1]]>
+            </Actif(0/1)>
+            
+            <Nom*>
+            <![CDATA[Electronics]]>
+            </Nom*>
+            </categorie><categorie>
+            <ID>
+            <![CDATA[28]]>
+            </ID>
+            
+            <Actif(0/1)>
+            <![CDATA[1]]>
+            </Actif(0/1)>
+            
+            <Nom*>
+            <![CDATA[Tablets]]>
+            </Nom*>
+            </categorie><categorie>
+            <ID>
+            <![CDATA[29]]>
+            </ID>
+            
+            <Actif(0/1)>
+            <![CDATA[1]]>
+            </Actif(0/1)>
+            
+            <Nom*>
+            <![CDATA[Drones]]>
+            </Nom*>
+            </categorie><categorie>
+            <ID>
+            <![CDATA[30]]>
+            </ID>
+            
+            <Actif(0/1)>
+            <![CDATA[1]]>
+            </Actif(0/1)>
+            
+            <Nom*>
+            <![CDATA[Computers]]>
+            </Nom*>
+            </categorie><categorie>
+            <ID>
+            <![CDATA[31]]>
+            </ID>
+            
+            <Actif(0/1)>
+            <![CDATA[1]]>
+            </Actif(0/1)>
+            
+            <Nom*>
+            <![CDATA[Gaming]]>
+            </Nom*>
+            </categorie><categorie>
+            <ID>
+            <![CDATA[32]]>
+            </ID>
+            
+            <Actif(0/1)>
+            <![CDATA[1]]>
+            </Actif(0/1)>
+            
+            <Nom*>
+            <![CDATA[Cameras]]>
+            </Nom*>
+            </categorie><categorie>
+            <ID>
+            <![CDATA[33]]>
+            </ID>
+            
+            <Actif(0/1)>
+            <![CDATA[1]]>
+            </Actif(0/1)>
+            
+            <Nom*>
+            <![CDATA[Printers]]>
+            </Nom*>
+            </categorie><categorie>
+            <ID>
+            <![CDATA[34]]>
+            </ID>
+            
+            <Actif(0/1)>
+            <![CDATA[0]]>
+            </Actif(0/1)>
+            
+            <Nom*>
+            <![CDATA[Software]]>
+            </Nom*>
+            </categorie><categorie>
+            <ID>
+            <![CDATA[35]]>
+            </ID>
+            
+            <Actif(0/1)>
+            <![CDATA[1]]>
+            </Actif(0/1)>
+            
+            <Nom*>
+            <![CDATA[Components]]>
+            </Nom*>
+            </categorie><categorie>
+            <ID>
+            <![CDATA[36]]>
+            </ID>
+            
+            <Actif(0/1)>
+            <![CDATA[0]]>
+            </Actif(0/1)>
+            
+            <Nom*>
+            <![CDATA[Office]]>
+            </Nom*>
+            </categorie><categorie>
+            <ID>
+            <![CDATA[37]]>
+            </ID>
+            
+            <Actif(0/1)>
+            <![CDATA[1]]>
+            </Actif(0/1)>
+            
+            <Nom*>
+            <![CDATA[Informatique]]>
+            </Nom*>
+            </categorie><categorie>
+            <ID>
+            <![CDATA[38]]>
+            </ID>
+            
+            <Actif(0/1)>
+            <![CDATA[1]]>
+            </Actif(0/1)>
+            
+            <Nom*>
+            <![CDATA[Mobile]]>
+            </Nom*>
+            </categorie>
+            </prestashop>
+            

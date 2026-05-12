@@ -243,6 +243,22 @@ Base URL :
 | Colonnes | col1, col2, col3… |
 | Ligne d'en-tête | Oui / Non |
 
+**Liste des donnees qu'on peut importer:**
+Dans le fichier AdminImportController.php:133 le contrôleur définit les entités importables :
+    Categories
+    Products
+    Combinations
+    Customers
+    Addresses
+    Brands
+    Suppliers
+    Alias
+    Store contacts
+
+    Également (si la config avancée de stock est activée) :
+    Supply Orders
+    Supply Order Details
+     
 **Snippet qui fonctionne :**
 
 ```js

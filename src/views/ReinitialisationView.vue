@@ -1,6 +1,7 @@
 <script setup>
 import { onMounted, ref } from 'vue'
-import { getRessources, deleteAllResourceData } from '../services/ressourcesService.js'
+import { getRessources } from '../services/ressourcesService.js'
+import { deleteAllResourceData } from '../services/deleteService.js'
 
 const ressources = ref([])
 const selectedRessources = ref(new Set())

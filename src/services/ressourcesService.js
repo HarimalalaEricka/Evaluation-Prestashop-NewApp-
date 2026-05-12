@@ -2,7 +2,7 @@ const BASE_URL = import.meta.env.VITE_API_PROXY_PATH
 const API_KEY = import.meta.env.VITE_API_KEY
 const REQUEST_TIMEOUT_MS = 10000
 
-function getAuthHeaders() {
+export function getAuthHeaders() {
     if (!API_KEY) {
         return {}
     }
@@ -22,6 +22,15 @@ function getResourceUrl(resourceElement) {
 }
 
 function singularizeResourceName(pluralName) {
+    const specialCases = {
+        categories: 'category',
+        categoriess: 'category'
+    }
+
+    if (specialCases[pluralName]) {
+        return specialCases[pluralName]
+    }
+
     // ies → y (categories → category)
     if (pluralName.endsWith('ies')) {
         return pluralName.slice(0, -3) + 'y'
@@ -62,7 +71,7 @@ function parseResourcesFromXml(xmlDoc, containerTagName, itemTagName = null) {
         }))
 }
 
-function getHttpErrorMessage(status) {
+export function getHttpErrorMessage(status) {
     if (status === 401 || status === 403) {
         return 'Erreur authentification API'
     }
@@ -74,6 +83,7 @@ function getHttpErrorMessage(status) {
     return 'Erreur ' + status
 }
 
+// maka anle /api/ rehetra
 export async function getRessources() {
     const controller = new AbortController()
     const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
@@ -111,6 +121,7 @@ export async function getRessources() {
     return parseResourcesFromXml(xmlDoc, 'api')
 }
 
+// maka ny data anle ressource manokana (ohatra products, categories, etc)
 export async function getRessourceData(ressourceName) {
     const controller = new AbortController()
     const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
@@ -151,96 +162,542 @@ export async function getRessourceData(ressourceName) {
     return parseResourcesFromXml(xmlDoc, 'prestashop', itemTagName)
 }
 
-export async function deleteResource(resourceName, id) {
-    if (!resourceName || !id) throw new Error('resourceName and id are required')
+// récupérer le schéma (structure) d'une ressource via ?schema=blank
+export async function getRessourceSchema(ressourceName) {
+    if (!ressourceName) throw new Error('resourceName required')
 
     const controller = new AbortController()
     const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
 
-    try {
-        const base = BASE_URL.replace(/\/$/, '')
-        const url = `${base}/${resourceName}/${id}`
+    let res
 
-        const res = await fetch(url, {
-            method: 'DELETE',
+    try {
+        res = await fetch(`${BASE_URL}/${ressourceName}?schema=blank`, {
             headers: {
                 ...getAuthHeaders(),
             },
             signal: controller.signal,
         })
-
-        if (!res.ok) throw new Error(getHttpErrorMessage(res.status))
-
-        // Many APIs return empty body on DELETE; consider 200/204 as success
-        return true
     } catch (error) {
-        if (error.name === 'AbortError') throw new Error('Timeout API')
-        throw error instanceof Error ? error : new Error(String(error))
+        if (error.name === 'AbortError') {
+            throw new Error('Timeout API')
+        }
+
+        throw new Error('Erreur réseau API')
     } finally {
         window.clearTimeout(timeoutId)
     }
+
+    if (!res.ok) throw new Error(getHttpErrorMessage(res.status))
+
+    const xmlText = await res.text()
+    const parser = new DOMParser()
+    const xmlDoc = parser.parseFromString(xmlText, 'application/xml')
+
+    if (xmlDoc.documentElement.nodeName === 'parsererror') {
+        throw new Error('Erreur parsing XML')
+    }
+
+    // chercher le premier élément d'exemple de la ressource (singulier)
+    const itemTagName = singularizeResourceName(ressourceName)
+    const items = xmlDoc.getElementsByTagName(itemTagName)
+
+    if (!items || items.length === 0) {
+        // fallback: essayer le nom tel quel
+        const tryDirect = xmlDoc.getElementsByTagName(ressourceName)
+        if (!tryDirect || tryDirect.length === 0) return []
+        const firstDirect = tryDirect[0]
+        return Array.from(firstDirect.children).map((c) => c.tagName).filter(Boolean)
+    }
+
+    const first = items[0]
+
+    // retourner les noms des champs enfants (ex: name, description, price...)
+    const childNames = Array.from(first.children)
+        .map((c) => c.tagName)
+        .filter((n, i, arr) => n && arr.indexOf(n) === i) // unique
+
+    return childNames
 }
 
-export async function deleteAllResourceData(resourceName, options = {}) {
-    // Options: { delayBetweenRequests: ms, batchSize: n }
-    const { delayBetweenRequests = 500, batchSize = 1 } = options
-
-    // Récupérer tous les items de la ressource
-    const items = await getRessourceData(resourceName)
-
-    // Extraire les ids
-    const ids = items.filter((item) => item.id).map((item) => item.id)
-
-    if (ids.length === 0) {
-        throw new Error(`Aucun item trouvé pour ${resourceName}`)
+// tramsforme les donnees en tableau en xml a envoyer a prestashop 
+export function convertCsvDataToXml(resourceName, rows, languages = [1]) {
+    if (!resourceName) {
+        throw new Error('resourceName required')
     }
 
-    const errors = []
-    const deleted = []
-    const results = {
-        resource: resourceName,
-        deleted,
-        errors,
-        deletedCount: 0,
-        errorCount: 0,
-        totalCount: ids.length,
+    if (!Array.isArray(rows)) {
+        throw new Error('rows must be an array')
     }
 
-    // Fonction utilitaire pour attendre
-    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+    const resource = resourceName.endsWith('s')
+        ? resourceName.slice(0, -1)
+        : resourceName
 
-    // Traiter en batches
-    for (let i = 0; i < ids.length; i += batchSize) {
-        const batch = ids.slice(i, i + batchSize)
+    const multilingualFields = [
+        'name',
+        'description',
+        'description_short',
+        'link_rewrite',
+        'meta_title',
+        'meta_description',
+        'meta_keywords',
+        'available_now',
+        'available_later'
+    ]
 
-        // Lancer les suppressions du batch en parallèle
-        const promises = batch.map(async (id) => {
-            try {
-                await deleteResource(resourceName, id)
-                deleted.push(id)
-                return { id, success: true }
-            } catch (error) {
-                const errorMsg = error instanceof Error ? error.message : String(error)
-                errors.push({
-                    id,
-                    message: errorMsg,
-                    timestamp: new Date().toISOString(),
+    let xml = `<?xml version="1.0" encoding="UTF-8"?>`
+    xml += `
+            <prestashop xmlns:xlink="http://www.w3.org/1999/xlink">
+            `
+
+                rows.forEach(row => {
+
+                    xml += `<${resource}>`
+
+                    Object.entries(row).forEach(([key, value]) => {
+
+                        if (value === undefined || value === null) {
+                            value = ''
+                        }
+
+                        // Champs multilingues
+                        if (multilingualFields.includes(key)) {
+
+                            xml += `<${key}>`
+
+                            languages.forEach(langId => {
+
+                                xml += `
+            <language id="${langId}">
+            <![CDATA[${value}]]>
+            </language>
+            `
+                            })
+
+                            xml += `</${key}>`
+                        }
+                        else {
+
+                            xml += `
+            <${key}>
+            <![CDATA[${value}]]>
+            </${key}>
+            `
+                        }
+                    })
+
+                    xml += `</${resource}>`
                 })
-                return { id, success: false, error: errorMsg }
+
+                xml += `
+            </prestashop>
+            `
+
+    return xml
+}
+
+export function convertRowsToIndividualXml(resourceName, rows, columnMappings = [], languages = [1], referenceLookups = {}) {
+    if (!resourceName) {
+        throw new Error('resourceName required')
+    }
+
+    if (!Array.isArray(rows)) {
+        throw new Error('rows must be an array')
+    }
+
+    const resource = singularizeResourceName(resourceName)
+    const normalizedResource = resource.toLowerCase()
+
+    const fieldTransformers = {
+        createMultiLangField: (value, langIds) => ({
+            isMultilingual: true,
+            languages: langIds.map((langId) => ({
+                id: langId,
+                value: String(value ?? '')
+            }))
+        }),
+        getBoolean: (value) => {
+            const normalized = String(value ?? '').trim().toLowerCase()
+            const truthyValues = ['1', 'true', 'yes', 'on']
+
+            return {
+                isMultilingual: false,
+                value: truthyValues.includes(normalized) ? '1' : '0'
             }
+        },
+        getPrice: (value) => ({
+            isMultilingual: false,
+            value: String(value ?? '0')
+                .replace(/,/g, '.')
+                .replace(/%/g, '')
+        }),
+        simple: (value) => ({
+            isMultilingual: false,
+            value: String(value ?? '')
         })
+    }
 
-        await Promise.all(promises)
-
-        // Attendre avant le prochain batch (sauf le dernier)
-        if (i + batchSize < ids.length && delayBetweenRequests > 0) {
-            await sleep(delayBetweenRequests)
+    const fieldConfig = {
+        name: 'createMultiLangField',
+        description: 'createMultiLangField',
+        description_short: 'createMultiLangField',
+        link_rewrite: 'createMultiLangField',
+        meta_title: 'createMultiLangField',
+        meta_description: 'createMultiLangField',
+        meta_keywords: 'createMultiLangField',
+        available_now: 'createMultiLangField',
+        available_later: 'createMultiLangField',
+        active: 'getBoolean',
+        online_only: 'getBoolean',
+        price_tex: 'getPrice',
+        price_tin: 'getPrice',
+        price: 'getPrice',
+        reduction_price: 'getPrice',
+        reduction_percent: 'getPrice',
+        wholesale_price: 'getPrice',
+        ecotax: 'getPrice',
+        tax_rate: 'getPrice'
+    }
+    // valeur par defaut au cas ou hoe tsy apetraka leizy
+    const defaultValues = {
+        category: {
+            active: '1',
+            id_parent: '2',
+            id_shop_default: '1',
+            link_rewrite: ''
+        },
+        product: {
+            active: '1',
+            id_shop_default: '1',
+            state: '1',
+            show_price: '1',
+            available_for_order: '1',
+            visibility: 'both',
+            on_sale: '0'
         }
     }
 
-    results.deletedCount = deleted.length
-    results.errorCount = errors.length
+    const multilingualFields = new Set([
+        'name',
+        'description',
+        'description_short',
+        'link_rewrite',
+        'meta_title',
+        'meta_description',
+        'meta_keywords',
+        'available_now',
+        'available_later'
+    ])
 
-    return results
+    const slugify = (value) => String(value ?? '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+
+    const parseDecimal = (value) => {
+        const normalized = String(value ?? '')
+            .trim()
+            .replace(/\s+/g, '')
+            .replace(/%/g, '')
+            .replace(/,/g, '.')
+
+        if (!normalized) {
+            return null
+        }
+
+        const parsed = Number(normalized)
+        return Number.isFinite(parsed) ? parsed : null
+    }
+
+    const parseDate = (value) => {
+        const cleaned = String(value ?? '').trim()
+
+        if (!cleaned) {
+            return null
+        }
+
+        const isoMatch = cleaned.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+        if (isoMatch) {
+            return cleaned
+        }
+
+        const slashMatch = cleaned.match(/^(\d{2})\/(\d{2})\/(\d{4})$/)
+        if (slashMatch) {
+            const [, day, month, year] = slashMatch
+            return `${year}-${month}-${day}`
+        }
+
+        const date = new Date(cleaned)
+        if (Number.isNaN(date.getTime())) {
+            return cleaned
+        }
+
+        const year = String(date.getFullYear())
+        const month = String(date.getMonth() + 1).padStart(2, '0')
+        const day = String(date.getDate()).padStart(2, '0')
+        return `${year}-${month}-${day}`
+    }
+
+    const formatDecimal = (value) => {
+        if (!Number.isFinite(value)) {
+            return '0'
+        }
+
+        return String(Math.round((value + Number.EPSILON) * 1000000) / 1000000)
+    }
+
+    const mappingLookup = Array.isArray(columnMappings)
+        ? columnMappings.reduce((accumulator, mapping) => {
+            if (!mapping || !mapping.csvColumn) {
+                return accumulator
+            }
+
+            const apiField = String(mapping.apiField ?? '').trim()
+            if (!apiField || apiField === 'no') {
+                return accumulator
+            }
+
+            accumulator[mapping.csvColumn] = apiField
+            return accumulator
+        }, {})
+        : {}
+
+    const normalizeLookupKey = (value) => String(value ?? '')
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '')
+
+    const normalizeRateKey = (value) => String(value ?? '')
+        .trim()
+        .replace(/%/g, '')
+        .replace(/,/g, '.')
+        .replace(/\s+/g, '')
+
+    const splitCategoryValues = (value) => String(value ?? '')
+        .split(/[,;|]/g)
+        .map((item) => item.trim())
+        .filter(Boolean)
+
+    const resolveCategoryId = (value) => {
+        const cleanedValue = String(value ?? '').trim()
+        if (!cleanedValue) {
+            return ''
+        }
+
+        if (/^\d+$/.test(cleanedValue)) {
+            return cleanedValue
+        }
+
+        const categoryLookup = referenceLookups.categoryNameLookup || {}
+        const normalizedValue = normalizeLookupKey(cleanedValue)
+
+        return categoryLookup[normalizedValue] || ''
+    }
+
+    function transformField(fieldName, value, langIds) {
+        const keyNorm = String(fieldName).replace(/\s+/g, '').toLowerCase()
+
+        if (keyNorm === 'id') {
+            return null
+        }
+
+        const transformerName = fieldConfig[fieldName] || 'simple'
+        const transformer = fieldTransformers[transformerName]
+
+        if (!transformer) {
+            throw new Error(`Transformateur inconnu: ${transformerName}`)
+        }
+
+        return transformer(value, langIds)
+    }
+
+    return rows.map((row) => {
+        const rowFields = {
+            ...(defaultValues[normalizedResource] || {})
+        }
+        let rawName = ''
+        let rawPriceTtc = null
+        let rawPriceHt = null
+        let rawWholesalePrice = null
+        let rawTaxRulesGroupId = null
+        let rawTaxRate = null
+
+        Object.entries(row).forEach(([csvColumn, csvValue]) => {
+            const apiField = mappingLookup[csvColumn]
+
+            if (!apiField) {
+                return
+            }
+
+            const normalizedCsvColumn = normalizeLookupKey(csvColumn)
+
+            if (normalizedResource === 'product' && (apiField === 'categories' || apiField === 'category' || apiField === 'id_category_default')) {
+                const categoryIds = splitCategoryValues(csvValue)
+                    .map(resolveCategoryId)
+                    .filter(Boolean)
+
+                if (apiField === 'id_category_default') {
+                    const defaultCategoryId = categoryIds[0] || resolveCategoryId(csvValue)
+                    if (defaultCategoryId) {
+                        rowFields.id_category_default = defaultCategoryId
+                        rowFields.associations = rowFields.associations || {}
+                        rowFields.associations.categories = rowFields.associations.categories || [{ id: defaultCategoryId }]
+                    }
+                } else if (categoryIds.length > 0) {
+                    rowFields.id_category_default = rowFields.id_category_default || categoryIds[0]
+                    rowFields.associations = rowFields.associations || {}
+                    rowFields.associations.categories = categoryIds.map((id) => ({ id }))
+                }
+
+                return
+            }
+
+            if (normalizedResource === 'product' && (apiField === 'tax_rate' || apiField === 'Taxe' || apiField === 'taxe')) {
+                rawTaxRate = csvValue
+                return
+            }
+
+            if (normalizedResource === 'product' && apiField === 'id_tax_rules_group') {
+                rawTaxRulesGroupId = csvValue
+            }
+
+            if (normalizedResource === 'product' && apiField === 'price') {
+                if (normalizedCsvColumn.includes('prix_ttc') || normalizedCsvColumn.includes('ttc')) {
+                    rawPriceTtc = csvValue
+                    return
+                }
+
+                rawPriceHt = csvValue
+                return
+            }
+
+            if (normalizedResource === 'product' && apiField === 'wholesale_price') {
+                rawWholesalePrice = csvValue
+            }
+
+            if (normalizedResource === 'product' && apiField === 'available_date') {
+                rowFields[apiField] = {
+                    isMultilingual: false,
+                    value: parseDate(csvValue) || ''
+                }
+                return
+            }
+
+            const transformed = transformField(apiField, csvValue, languages)
+
+            if (transformed === null) {
+                return
+            }
+
+            rowFields[apiField] = transformed
+
+            if (apiField === 'name') {
+                rawName = String(csvValue ?? '')
+            }
+        })
+
+        if (normalizedResource === 'product') {
+            const explicitPrice = parseDecimal(rawPriceHt)
+            const ttcPrice = parseDecimal(rawPriceTtc)
+            let resolvedTaxRulesGroupId = String(rawTaxRulesGroupId ?? '').trim()
+
+            if (!resolvedTaxRulesGroupId && rawTaxRate) {
+                resolvedTaxRulesGroupId = referenceLookups.taxRateToGroupIdLookup?.[normalizeRateKey(rawTaxRate)] || ''
+            }
+
+            if (resolvedTaxRulesGroupId) {
+                rowFields.id_tax_rules_group = resolvedTaxRulesGroupId
+            }
+
+            const lookupTaxRate = resolvedTaxRulesGroupId
+                ? parseDecimal(referenceLookups.taxRulesGroupRateLookup?.[resolvedTaxRulesGroupId])
+                : null
+            const taxRate = parseDecimal(rawTaxRate) ?? lookupTaxRate ?? 0
+
+            if (explicitPrice !== null) {
+                rowFields.price = {
+                    isMultilingual: false,
+                    value: formatDecimal(explicitPrice)
+                }
+            } else if (ttcPrice !== null) {
+                const taxFactor = 1 + (taxRate / 100)
+                const htPrice = taxRate > 0 && taxFactor > 0 ? (ttcPrice / taxFactor) : ttcPrice
+                rowFields.price = {
+                    isMultilingual: false,
+                    value: formatDecimal(htPrice)
+                }
+            }
+
+            if (rawWholesalePrice !== null && rowFields.wholesale_price === undefined) {
+                rowFields.wholesale_price = {
+                    isMultilingual: false,
+                    value: formatDecimal(parseDecimal(rawWholesalePrice) ?? 0)
+                }
+            }
+        }
+
+        if (normalizedResource === 'category' && !rowFields.link_rewrite) {
+            const sourceName = rawName || (rowFields.name && rowFields.name.isMultilingual
+                ? rowFields.name.languages[0]?.value
+                : '')
+
+            rowFields.link_rewrite = fieldTransformers.createMultiLangField(slugify(sourceName), languages)
+        }
+
+        let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`
+        xml += `<prestashop xmlns:xlink="http://www.w3.org/1999/xlink">\n`
+        xml += `<${resource}>`
+
+        Object.entries(rowFields).forEach(([fieldName, fieldValue]) => {
+            if (fieldName === 'associations' || fieldName === 'tax_rate') {
+                return
+            }
+
+            if (fieldValue === undefined || fieldValue === null) {
+                return
+            }
+
+            if (multilingualFields.has(fieldName) && fieldValue.isMultilingual) {
+                xml += `\n<${fieldName}>`
+                fieldValue.languages.forEach(({ id, value: langValue }) => {
+                    xml += `\n  <language id="${id}"><![CDATA[${langValue}]]></language>`
+                })
+                xml += `\n</${fieldName}>`
+                return
+            }
+
+            if (typeof fieldValue === 'object' && fieldValue !== null && 'value' in fieldValue) {
+                xml += `\n<${fieldName}><![CDATA[${fieldValue.value}]]></${fieldName}>`
+                return
+            }
+
+            xml += `\n<${fieldName}><![CDATA[${fieldValue}]]></${fieldName}>`
+        })
+
+        if (normalizedResource === 'product' && rowFields.associations && Array.isArray(rowFields.associations.categories) && rowFields.associations.categories.length > 0) {
+            xml += `\n<associations>`
+            xml += `\n  <categories>`
+            rowFields.associations.categories.forEach(({ id }) => {
+                if (!id) {
+                    return
+                }
+
+                xml += `\n    <category>`
+                xml += `\n      <id><![CDATA[${id}]]></id>`
+                xml += `\n    </category>`
+            })
+            xml += `\n  </categories>`
+            xml += `\n</associations>`
+        }
+
+        xml += `\n</${resource}>\n</prestashop>`
+
+        return xml
+    })
 }
-
