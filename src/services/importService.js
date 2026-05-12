@@ -782,23 +782,30 @@ async function getStockAvailableEntry(productId, productAttributeId) {
     }
 
     try {
-        const xmlDoc = await fetchXmlDocument(`stock_availables?filter[id_product]=${cleanedProductId}&filter[id_product_attribute]=${cleanedProductAttributeId}`)
-        const stockNodes = Array.from(xmlDoc.getElementsByTagName('stock_available'))
+        // Fetch ALL stock_availables (API filter doesn't work reliably)
+        const xmlDoc = await fetchXmlDocument(`stock_availables?display=[id,id_product,id_product_attribute,quantity,id_shop,id_shop_group,out_of_stock,depends_on_stock]`)
+        const allStockNodes = Array.from(xmlDoc.getElementsByTagName('stock_available'))
 
-        if (stockNodes.length > 0) {
-            const stockNode = stockNodes[0]
-            return {
-                id: String(stockNode.getElementsByTagName('id')[0]?.textContent ?? '').trim(),
-                quantity: String(stockNode.getElementsByTagName('quantity')[0]?.textContent ?? '0').trim(),
-                idShop: String(stockNode.getElementsByTagName('id_shop')[0]?.textContent ?? DEFAULT_ID_SHOP).trim(),
-                idShopGroup: String(stockNode.getElementsByTagName('id_shop_group')[0]?.textContent ?? DEFAULT_ID_SHOP_GROUP).trim(),
-                outOfStock: String(stockNode.getElementsByTagName('out_of_stock')[0]?.textContent ?? DEFAULT_OUT_OF_STOCK).trim(),
-                dependsOnStock: String(stockNode.getElementsByTagName('depends_on_stock')[0]?.textContent ?? DEFAULT_DEPENDS_ON_STOCK).trim(),
+        // Filter client-side for the matching product/attribute
+        for (const stockNode of allStockNodes) {
+            const nodeProductId = String(stockNode.getElementsByTagName('id_product')[0]?.textContent ?? '').trim()
+            const nodeAttrId = String(stockNode.getElementsByTagName('id_product_attribute')[0]?.textContent ?? '0').trim() || '0'
+
+            if (nodeProductId === cleanedProductId && nodeAttrId === cleanedProductAttributeId) {
+                return {
+                    id: String(stockNode.getElementsByTagName('id')[0]?.textContent ?? '').trim(),
+                    quantity: String(stockNode.getElementsByTagName('quantity')[0]?.textContent ?? '0').trim(),
+                    idShop: String(stockNode.getElementsByTagName('id_shop')[0]?.textContent ?? DEFAULT_ID_SHOP).trim(),
+                    idShopGroup: String(stockNode.getElementsByTagName('id_shop_group')[0]?.textContent ?? DEFAULT_ID_SHOP_GROUP).trim(),
+                    outOfStock: String(stockNode.getElementsByTagName('out_of_stock')[0]?.textContent ?? DEFAULT_OUT_OF_STOCK).trim(),
+                    dependsOnStock: String(stockNode.getElementsByTagName('depends_on_stock')[0]?.textContent ?? DEFAULT_DEPENDS_ON_STOCK).trim(),
+                }
             }
         }
 
         return null
-    } catch {
+    } catch (err) {
+        console.error(`[STOCK] Error fetching stock_available for product ${cleanedProductId} attr ${cleanedProductAttributeId}:`, err)
         return null
     }
 }
@@ -807,8 +814,6 @@ export async function upsertStockAvailable({ productId, productAttributeId = '0'
     const cleanedProductId = String(productId ?? '').trim()
     const cleanedProductAttributeId = String(productAttributeId ?? '0').trim() || '0'
     const cleanedQuantity = String(quantity ?? '0').trim()
-    const cleanedIdShop = String(idShop ?? DEFAULT_ID_SHOP).trim()
-    const cleanedIdShopGroup = String(idShopGroup ?? DEFAULT_ID_SHOP_GROUP).trim()
     const cleanedOutOfStock = String(outOfStock ?? DEFAULT_OUT_OF_STOCK).trim()
     const cleanedDependsOnStock = String(dependsOnStock ?? DEFAULT_DEPENDS_ON_STOCK).trim()
 
@@ -817,13 +822,37 @@ export async function upsertStockAvailable({ productId, productAttributeId = '0'
     }
 
     try {
-        const stock = await getStockAvailableEntry(cleanedProductId, cleanedProductAttributeId)
+        let stock = await getStockAvailableEntry(cleanedProductId, cleanedProductAttributeId)
 
-        if (stock?.id) {
-            // UPDATE existing
-            const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<prestashop xmlns:xlink="http://www.w3.org/1999/xlink">\n<stock_available>\n<id><![CDATA[${stock.id}]]></id>\n<quantity><![CDATA[${cleanedQuantity}]]></quantity>\n<id_shop><![CDATA[${cleanedIdShop}]]></id_shop>\n<id_shop_group><![CDATA[${cleanedIdShopGroup}]]></id_shop_group>\n<out_of_stock><![CDATA[${cleanedOutOfStock}]]></out_of_stock>\n<depends_on_stock><![CDATA[${cleanedDependsOnStock}]]></depends_on_stock>\n</stock_available>\n</prestashop>`
-            return await updateResourceData('stock_availables', stock.id, xml)
+        // If stock entry not found, wait and retry (PrestaShop creates it automatically after product/combination creation)
+        if (!stock?.id) {
+            await new Promise((resolve) => setTimeout(resolve, 800))
+            stock = await getStockAvailableEntry(cleanedProductId, cleanedProductAttributeId)
         }
+
+        if (!stock?.id) {
+            // Stock entry still doesn't exist - log and skip
+            console.warn(`[STOCK] Warning: stock_available entry not found for product ${cleanedProductId} attr ${cleanedProductAttributeId}. Will not be updated.`)
+            return undefined
+        }
+
+        // Use existing shop/shop_group values from DB to preserve them
+        const finalIdShop = String(idShop ?? stock.idShop ?? DEFAULT_ID_SHOP).trim()
+        const finalIdShopGroup = String(idShopGroup ?? stock.idShopGroup ?? DEFAULT_ID_SHOP_GROUP).trim()
+
+        // UPDATE existing - use buildStockAvailableXml to ensure all required fields
+        const xml = buildStockAvailableXml({
+            id: stock.id,
+            productId: cleanedProductId,
+            productAttributeId: cleanedProductAttributeId,
+            quantity: cleanedQuantity,
+            idShop: finalIdShop,
+            idShopGroup: finalIdShopGroup,
+            outOfStock: cleanedOutOfStock,
+            dependsOnStock: cleanedDependsOnStock,
+        })
+        console.log(`[STOCK] Updating id_stock_available=${stock.id} to quantity=${cleanedQuantity}`)
+        return await updateResourceData('stock_availables', stock.id, xml)
     } catch (err) {
         throw new Error(`Stock upsert failed for product ${cleanedProductId}: ${err instanceof Error ? err.message : String(err)}`)
     }

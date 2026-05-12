@@ -602,26 +602,15 @@ export default {
 
                                 await forceProductCombinationMode(operation.productId, combinationId)
 
-                                if (operation.resource === 'combinations' && operation.stockQuantity !== null && operation.stockQuantity !== undefined) {
-                                    const combinationId = this.extractCreatedId(response)
+                                // Attendre que PrestaShop génère l'entrée stock_available automatiquement
+                                await new Promise((resolve) => setTimeout(resolve, 800))
 
-                                    if (!combinationId) {
-                                        throw new Error('Impossible de récupérer l\'ID de la combinaison créée pour mettre à jour le stock')
-                                    }
-
-                                    await forceProductCombinationMode(operation.productId, combinationId)
-
-                                    // Attendre que PrestaShop génère l'entrée stock_available automatiquement
-                                    await new Promise((resolve) => setTimeout(resolve, 800))
-
-                                    await upsertStockAvailable({
-                                        productId: operation.productId,
-                                        productAttributeId: combinationId,
-                                        quantity: operation.stockQuantity,
-                                    })
-                                    console.log(`Stock combinaison mis à jour ligne ${i + 1} (produit=${operation.productId}, combinaison=${combinationId}, quantité=${operation.stockQuantity})`)
-                                }
-
+                                await upsertStockAvailable({
+                                    productId: operation.productId,
+                                    productAttributeId: combinationId,
+                                    quantity: operation.stockQuantity,
+                                })
+                                console.log(`Stock combinaison mis à jour ligne ${i + 1} (produit=${operation.productId}, combinaison=${combinationId}, quantité=${operation.stockQuantity})`)
                             }
 
                             results.success += 1
