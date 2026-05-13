@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<prestashop xmlns:xlink="http://www.w3.org/1999/xlink">
+  <category>
+    <id_parent><![CDATA[0]]></id_parent>
+
+    <active><![CDATA[1]]></active>
+
+    <nom>
+      <language id="1"><![CDATA[Homme]]></language>
+    </nom>
+
+    <link_rewrite>
+      <language id="1"><![CDATA[homme]]></language>
+    </link_rewrite>
+
+    <description>
+      <language id="1"><![CDATA[Catégorie Homme]]></language>
+    </description>
+
+    <id_shop_default><![CDATA[1]]></id_shop_default>
+  </category>
+</prestashop>
