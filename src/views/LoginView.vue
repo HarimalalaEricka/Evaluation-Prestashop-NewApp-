@@ -5,8 +5,8 @@ import { checkLogin } from '../services/loginService.js'
 
 const router = useRouter()
 const customerConnected = ref(null)
-const email = ref('rakoto@yopmail.com')
-const password = ref('XvzsX5O0!GBD0uXQ')
+const email = ref('nam@gmail.com')
+const password = ref('nam')
 
 async function Connect() {
     try {
@@ -20,7 +20,7 @@ async function Connect() {
                 JSON.stringify(result)
             )
             //redirection
-            router.push('/reset') 
+            router.push('/orders') 
         }
 
     } catch (error) {

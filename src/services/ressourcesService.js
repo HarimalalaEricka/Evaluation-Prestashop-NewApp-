@@ -26,7 +26,8 @@ function getResourceUrl(resourceElement) {
 function singularizeResourceName(pluralName) {
     const specialCases = {
         categories: 'category',
-        categoriess: 'category'
+        categoriess: 'category',
+        order_states: 'order_state'
     }
 
     if (specialCases[pluralName]) {
@@ -799,3 +800,95 @@ export async function getRessourceItemById(resourceName, id) {
 //   }
 // }
 // customer.associations.groups.group.id
+
+export async function updateResourceData(resourceName, resourceId, xmlData)
+{
+    if (!resourceName) {
+        throw new Error('resourceName required')
+    }
+
+    if (!resourceId) {
+        throw new Error('resourceId required')
+    }
+
+    if (!xmlData) {
+        throw new Error('xml data required')
+    }
+
+    const controller = new AbortController()
+
+    const timeoutId = window.setTimeout(
+        () => controller.abort(),
+        REQUEST_TIMEOUT_MS
+    )
+
+    try {
+        const base = BASE_URL.replace(/\/$/, '')
+        const url = `${base}/${resourceName}/${resourceId}`
+
+        const res = await fetch(url, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/xml',
+                ...getAuthHeaders(),
+            },
+            body: xmlData,
+            signal: controller.signal,
+        })
+
+        if (!res.ok) {
+            const statusText = `${res.status} ${res.statusText}`
+            const errorText = await res.text()
+            try {
+                console.error(`[API] PUT ${url} failed: ${statusText}`)
+                console.error('[API] Response body:', errorText)
+                console.error('[API] Payload (truncated):', String(xmlData ?? '').slice(0, 2000))
+            } catch (e) {
+                // ignore logging errors
+            }
+            throw new Error(`API PUT ${statusText}: ${String(errorText).slice(0, 2000)}`)
+        }
+
+        return await res.text()
+    } catch (error) {
+        if (error.name === 'AbortError') {
+            throw new Error('Timeout API')
+        }
+
+        throw error instanceof Error
+            ? error
+            : new Error(String(error))
+    } finally {
+        window.clearTimeout(timeoutId)
+    }
+}
+
+// récupérer l'XML brut d'un élément (utile pour reconstruire et PUT sans perdre de champs)
+export async function getRessourceItemXml(resourceName, id) {
+    if (!resourceName) throw new Error('resourceName required')
+    if (id == null) throw new Error('id required')
+
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+
+    try {
+        const res = await fetch(`${BASE_URL}/${resourceName}/${id}`, {
+            headers: getAuthHeaders(),
+            signal: controller.signal
+        })
+
+        if (!res.ok) {
+            throw new Error(getHttpErrorMessage(res.status))
+        }
+
+        return await res.text()
+    } catch (error) {
+        if (error.name === 'AbortError') {
+            throw new Error('Timeout API')
+        }
+
+        throw error
+    } finally {
+        clearTimeout(timeoutId)
+    }
+}

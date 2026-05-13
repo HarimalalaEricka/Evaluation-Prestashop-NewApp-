@@ -1,4 +1,4 @@
-import { getRessourceData, getAuthHeaders, getHttpErrorMessage } from './ressourcesService.js'
+import { getRessourceData, getAuthHeaders, getHttpErrorMessage, updateResourceData } from './ressourcesService.js'
 
 const BASE_URL = import.meta.env.VITE_API_PROXY_PATH
 const ID_COUNTRY = import.meta.env.VITE_ID_COUNTRY
@@ -2054,67 +2054,7 @@ export async function insertResourceData(resourceName, xmlData)
     }
 }
 
-export async function updateResourceData(resourceName, resourceId, xmlData)
-{
-    if (!resourceName) {
-        throw new Error('resourceName required')
-    }
 
-    if (!resourceId) {
-        throw new Error('resourceId required')
-    }
-
-    if (!xmlData) {
-        throw new Error('xml data required')
-    }
-
-    const controller = new AbortController()
-
-    const timeoutId = window.setTimeout(
-        () => controller.abort(),
-        REQUEST_TIMEOUT_MS
-    )
-
-    try {
-        const base = BASE_URL.replace(/\/$/, '')
-        const url = `${base}/${resourceName}/${resourceId}`
-
-        const res = await fetch(url, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/xml',
-                ...getAuthHeaders(),
-            },
-            body: xmlData,
-            signal: controller.signal,
-        })
-
-        if (!res.ok) {
-            const statusText = `${res.status} ${res.statusText}`
-            const errorText = await res.text()
-            try {
-                console.error(`[API] PUT ${url} failed: ${statusText}`)
-                console.error('[API] Response body:', errorText)
-                console.error('[API] Payload (truncated):', String(xmlData ?? '').slice(0, 2000))
-            } catch (e) {
-                // ignore logging errors
-            }
-            throw new Error(`API PUT ${statusText}: ${String(errorText).slice(0, 2000)}`)
-        }
-
-        return await res.text()
-    } catch (error) {
-        if (error.name === 'AbortError') {
-            throw new Error('Timeout API')
-        }
-
-        throw error instanceof Error
-            ? error
-            : new Error(String(error))
-    } finally {
-        window.clearTimeout(timeoutId)
-    }
-}
 
 export async function patchResourceData(resourceName, resourceId, xmlData)
 {
