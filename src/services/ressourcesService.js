@@ -2,6 +2,7 @@ const BASE_URL = import.meta.env.VITE_API_PROXY_PATH
 const API_KEY = import.meta.env.VITE_API_KEY
 const REQUEST_TIMEOUT_MS = 10000
 
+// Header pour appele l API_KEY
 export function getAuthHeaders() {
     if (!API_KEY) {
         return {}
@@ -21,6 +22,7 @@ function getResourceUrl(resourceElement) {
     )
 }
 
+// Singulariser les noms de ressources pour trouver les balises d'items (ex: categories → category, products → product, etc)
 function singularizeResourceName(pluralName) {
     const specialCases = {
         categories: 'category',
@@ -49,6 +51,7 @@ function singularizeResourceName(pluralName) {
     return pluralName
 }
 
+// parser le XML de la liste des ressources ou des items d'une ressource en tableau d'objets { name, url, id }
 function parseResourcesFromXml(xmlDoc, containerTagName, itemTagName = null) {
     const containerNode = xmlDoc.getElementsByTagName(containerTagName)[0]
 
@@ -701,3 +704,98 @@ export function convertRowsToIndividualXml(resourceName, rows, columnMappings = 
         return xml
     })
 }
+
+function xmlNodeToObject(node) {
+    // Pas d'enfants => valeur texte
+    if (!node.children.length) {
+        return node.textContent.trim()
+    }
+
+    const result = {}
+
+    Array.from(node.children).forEach(child => {
+        const key = child.tagName
+        const value = xmlNodeToObject(child)
+
+        // gérer les tableaux (plusieurs balises identiques)
+        if (result[key]) {
+            if (!Array.isArray(result[key])) {
+                result[key] = [result[key]]
+            }
+            result[key].push(value)
+        } else {
+            result[key] = value
+        }
+    })
+
+    return result
+}
+
+
+// récupérer un élément (par id) d'une ressource (ex: customers/3)
+export async function getRessourceItemById(resourceName, id) {
+    if (!resourceName) throw new Error('resourceName required')
+    if (id == null) throw new Error('id required')
+
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => {
+        controller.abort()
+    }, REQUEST_TIMEOUT_MS)
+
+    try {
+        const res = await fetch(`${BASE_URL}/${resourceName}/${id}`, {
+            headers: getAuthHeaders(),
+            signal: controller.signal
+        })
+
+        if (!res.ok) {
+            throw new Error(getHttpErrorMessage(res.status))
+        }
+
+        const xmlText = await res.text()
+
+        const parser = new DOMParser()
+        const xmlDoc = parser.parseFromString(xmlText, 'application/xml')
+
+        if (xmlDoc.querySelector('parsererror')) {
+            throw new Error('Erreur parsing XML')
+        }
+
+        const itemTag = singularizeResourceName(resourceName)
+        const itemNode = xmlDoc.getElementsByTagName(itemTag)[0]
+
+        if (!itemNode) {
+            throw new Error(`${itemTag} introuvable`)
+        }
+
+        return xmlNodeToObject(itemNode)
+
+    } catch (error) {
+        if (error.name === 'AbortError') {
+            throw new Error('Timeout API')
+        }
+
+        throw error
+    } finally {
+        clearTimeout(timeoutId)
+    }
+}
+
+// {
+//   id: "24",
+//   id_default_group: "2",
+//   id_lang: "1",
+//   lastname: "Randrianomena",
+//   firstname: "Harimalala",
+//   email: "harimalalaerickarandria@gmail.com",
+//   active: "1",
+//   is_guest: "1",
+//   associations: {
+//     groups: {
+//       group: {
+//         id: "2"
+//       }
+//     }
+//   }
+// }
+// customer.associations.groups.group.id

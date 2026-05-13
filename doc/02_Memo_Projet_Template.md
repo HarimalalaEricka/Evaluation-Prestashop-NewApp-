@@ -269,13 +269,10 @@ Dans le fichier AdminImportController.php:133 le contrôleur définit les entit�
 
 ## 🌐 APPELS API DEPUIS MON CODE
 
-**Librairie utilisée :** `_______________`
+**Librairie utilisée :** ``
 
-**Auth :** Bearer Token / API Key / Basic / Aucune
+**Auth :** API Key
 
-**Header :** `Authorization: Bearer _______________`
-
-**Snippet GET :**
 
 ```js
 // Coller ici ton snippet GET qui fonctionne
@@ -288,6 +285,94 @@ Dans le fichier AdminImportController.php:133 le contrôleur définit les entit�
 ```
 
 ---
+
+## Fonctionnalités Réalisées 
+**Fonctionnalité :** **LOGIN et LOG OUT**
+
+**Endpoint utilisé :** /api/customers/{id}
+
+**Description :**verifie les login
+
+**Code principal :**
+```js
+export async function checkLogin(email, password) {
+    if (!email || !password) throw new Error('Username and password are required')
+
+    const customers = await getRessourceData('customers')
+    let customerconnected = null
+    try {
+        for (const customer of customers) {
+            if (!customer?.id) {
+                continue
+            }
+
+            const customerDetails = await getRessourceItemById('customers', customer.id)
+            if(customerDetails.email === email)
+            {
+                customerconnected = customerDetails
+                break;
+            }
+        }
+        if( !customerconnected) throw new Error('Invalid email or password')
+        return customerconnected
+    } catch (error) {
+        throw error instanceof Error ? error : new Error(String(error))
+    }
+}
+```
+**Difficultés rencontrées & Solutions :**Mot de passe hashe depuis prestashop et impossible de le decrypter -> encore pas de solution
+
+
+**Fonctionnalité :** RECUPERER LA LISTE DES RESSOURCES
+
+**Date :**
+
+**Endpoint utilisé :** /api/
+
+**Description :**RETOURNE LA LISTE DES API AUTORISE DANS LE WEBSERVICE DU BO DE PRESTASHOP
+
+**Code principal :**
+```js
+export async function getRessources() {
+    const controller = new AbortController()
+    const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+
+    let res
+
+    try {
+        res = await fetch(`${BASE_URL}/`, {
+        // ito le manome authorization header raha misy API key, raha tsy misy dia tsy asiana
+        headers: {
+            ...getAuthHeaders(),
+        },
+        signal: controller.signal,
+        })
+    } catch (error) {
+        if (error.name === 'AbortError') {
+        throw new Error('Timeout API')
+        }
+
+        throw new Error('Erreur réseau API')
+    } finally {
+        window.clearTimeout(timeoutId)
+    }
+
+    if (!res.ok) throw new Error(getHttpErrorMessage(res.status))
+
+    const xmlText = await res.text()
+    const parser = new DOMParser()
+    const xmlDoc = parser.parseFromString(xmlText, 'application/xml')
+
+    if (xmlDoc.documentElement.nodeName === 'parsererror') {
+        throw new Error('Erreur parsing XML')
+    }
+
+    return parseResourcesFromXml(xmlDoc, 'api')
+}
+```
+**Difficultés rencontrées & Solutions :**
+
+**Temps passé :**
 
 ## 🐛 ERREURS RENCONTRÉES ET SOLUTIONS
 

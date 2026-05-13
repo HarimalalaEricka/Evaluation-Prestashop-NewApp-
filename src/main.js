@@ -9,4 +9,17 @@ const app = createApp(App)
 app.use(createPinia())
 app.use(router)
 
+// Écoute les changements de localStorage provenant d'autres onglets.
+// Si la clé `customerConnected` est supprimée ailleurs, rediriger vers la page de login.
+window.addEventListener('storage', (event) => {
+	if (event.key === 'customerConnected' && !event.newValue) {
+		try {
+			router.push('/')
+		} catch (err) {
+			// ignore if router non disponible
+			console.error('Erreur lors de la redirection après storage event', err)
+		}
+	}
+})
+
 app.mount('#app')

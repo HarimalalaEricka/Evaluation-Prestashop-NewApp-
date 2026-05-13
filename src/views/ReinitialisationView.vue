@@ -2,6 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { getRessources } from '../services/ressourcesService.js'
 import { deleteAllResourceData } from '../services/deleteService.js'
+import Disconnect from '../components/Disconnect.vue'
 
 const ressources = ref([])
 const selectedRessources = ref(new Set())
@@ -86,6 +87,7 @@ onMounted(async () => {
 
 <template>
   <div>
+    <Disconnect />
     <h1>Reinitialisation</h1>
     <button @click="SelectAll">
         <p v-if="allselected">Tout désélectionner</p>
