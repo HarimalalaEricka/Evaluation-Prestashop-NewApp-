@@ -269,13 +269,10 @@ Dans le fichier AdminImportController.php:133 le contrôleur définit les entit�
 
 ## 🌐 APPELS API DEPUIS MON CODE
 
-**Librairie utilisée :** `_______________`
+**Librairie utilisée :** ``
 
-**Auth :** Bearer Token / API Key / Basic / Aucune
+**Auth :** API Key
 
-**Header :** `Authorization: Bearer _______________`
-
-**Snippet GET :**
 
 ```js
 // Coller ici ton snippet GET qui fonctionne
@@ -288,6 +285,58 @@ Dans le fichier AdminImportController.php:133 le contrôleur définit les entit�
 ```
 
 ---
+
+## Fonctionnalités Réalisées 
+**Fonctionnalité :** RECUPERER LA LISTE DES RESSOURCES
+
+**Date :**
+
+**Endpoint utilisé :** /api/
+
+**Description :**RETOURNE LA LISTE DES API AUTORISE DANS LE WEBSERVICE DU BO DE PRESTASHOP
+
+**Code principal :**
+```js
+export async function getRessources() {
+    const controller = new AbortController()
+    const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+
+    let res
+
+    try {
+        res = await fetch(`${BASE_URL}/`, {
+        // ito le manome authorization header raha misy API key, raha tsy misy dia tsy asiana
+        headers: {
+            ...getAuthHeaders(),
+        },
+        signal: controller.signal,
+        })
+    } catch (error) {
+        if (error.name === 'AbortError') {
+        throw new Error('Timeout API')
+        }
+
+        throw new Error('Erreur réseau API')
+    } finally {
+        window.clearTimeout(timeoutId)
+    }
+
+    if (!res.ok) throw new Error(getHttpErrorMessage(res.status))
+
+    const xmlText = await res.text()
+    const parser = new DOMParser()
+    const xmlDoc = parser.parseFromString(xmlText, 'application/xml')
+
+    if (xmlDoc.documentElement.nodeName === 'parsererror') {
+        throw new Error('Erreur parsing XML')
+    }
+
+    return parseResourcesFromXml(xmlDoc, 'api')
+}
+```
+**Difficultés rencontrées & Solutions :**
+
+**Temps passé :**
 
 ## 🐛 ERREURS RENCONTRÉES ET SOLUTIONS
 
