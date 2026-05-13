@@ -5,7 +5,6 @@ export async function checkLogin(email, password) {
 
     const customers = await getRessourceData('customers')
     let customerconnected = null
-
     try {
         for (const customer of customers) {
             if (!customer?.id) {

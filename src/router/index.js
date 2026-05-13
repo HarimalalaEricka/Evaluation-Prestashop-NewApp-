@@ -11,16 +11,19 @@ const router = createRouter({
       path: '/reset',
       name: 'reinitialisation',
       component: ReinitialisationView,
+      meta: { requiresAuth: true },
     },
     {
       path: '/testcsv',
       name: 'testcsv',
       component: TestCsvView,
+      meta: { requiresAuth: true },
     },
     {
       path: '/importcsv',
       name: 'importcsv',
       component: ImportCsvView,
+      meta: { requiresAuth: true },
     },
     {
       path: '/',

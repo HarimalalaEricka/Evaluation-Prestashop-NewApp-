@@ -287,6 +287,42 @@ Dans le fichier AdminImportController.php:133 le contrôleur définit les entit�
 ---
 
 ## Fonctionnalités Réalisées 
+**Fonctionnalité :** **LOGIN et LOG OUT**
+
+**Endpoint utilisé :** /api/customers/{id}
+
+**Description :**verifie les login
+
+**Code principal :**
+```js
+export async function checkLogin(email, password) {
+    if (!email || !password) throw new Error('Username and password are required')
+
+    const customers = await getRessourceData('customers')
+    let customerconnected = null
+    try {
+        for (const customer of customers) {
+            if (!customer?.id) {
+                continue
+            }
+
+            const customerDetails = await getRessourceItemById('customers', customer.id)
+            if(customerDetails.email === email)
+            {
+                customerconnected = customerDetails
+                break;
+            }
+        }
+        if( !customerconnected) throw new Error('Invalid email or password')
+        return customerconnected
+    } catch (error) {
+        throw error instanceof Error ? error : new Error(String(error))
+    }
+}
+```
+**Difficultés rencontrées & Solutions :**Mot de passe hashe depuis prestashop et impossible de le decrypter -> encore pas de solution
+
+
 **Fonctionnalité :** RECUPERER LA LISTE DES RESSOURCES
 
 **Date :**
