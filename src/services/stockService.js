@@ -19,6 +19,24 @@ function getMultilingualText(value) {
     return String(value)
 }
 
+function normalizeWebserviceItems(value) {
+    if (!value) return []
+
+    const items = Array.isArray(value) ? value : [value]
+
+    return items
+        .map((item) => {
+            if (item == null) return null
+
+            if (typeof item === 'object') {
+                return item.id ?? item.attrs?.id ?? item['@attributes']?.id ?? null
+            }
+
+            return item
+        })
+        .filter((item) => item !== null && item !== undefined && item !== '')
+}
+
 export async function getAllStocks()
 {
     const stockDetails = []
@@ -41,6 +59,37 @@ export async function getAllStocks()
             const product = await getRessourceItemById('products', stockDetail.id_product)
             if( stockDetail.id_product_attribute == '0' && product.product_type == 'combinations' ) continue
             stockDetail.product_name = getMultilingualText(product?.name) || `Produit #${stockDetail.id_product}`
+
+            if (stockDetail.id_product_attribute != '0') {
+                try {
+                    const combination = await getRessourceItemById('combinations', stockDetail.id_product_attribute)
+                    const productOptionValues = normalizeWebserviceItems(
+                        combination?.associations?.product_option_values?.product_option_value
+                    )
+
+                    if (productOptionValues.length > 0) {
+                        const labels = []
+
+                        for (const productOptionValueId of productOptionValues) {
+                            const optionValue = await getRessourceItemById('product_option_values', productOptionValueId)
+                            if (!optionValue?.id) continue
+
+                            const groupId = optionValue.id_attribute_group
+                            const group = groupId ? await getRessourceItemById('product_options', groupId) : null
+
+                            const groupName = getMultilingualText(group?.name) || `Groupe #${groupId ?? '?'}`
+                            const valueName = getMultilingualText(optionValue?.name) || `Valeur #${productOptionValueId}`
+                            labels.push(`${groupName}: ${valueName}`)
+                        }
+
+                        if (labels.length > 0) {
+                            stockDetail.product_name += ` (${labels.join(', ')})`
+                        }
+                    }
+                } catch (error) {
+                    console.warn(`Impossible de charger les attributs pour la combinaison ${stockDetail.id_product_attribute}:`, error)
+                }
+            }
             stockDetails.push(stockDetail)
         }
     } catch (error) {
