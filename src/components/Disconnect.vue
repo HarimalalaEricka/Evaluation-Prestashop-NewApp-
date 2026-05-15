@@ -4,8 +4,22 @@ const router = useRouter()
 function disconnect()
 {
     try {
+        const isAdmin = localStorage.getItem('userConnected')
+        const isCustomer = localStorage.getItem('customerConnected')
+        
+        // Supprimer les deux sessions
+        localStorage.removeItem('userConnected')
         localStorage.removeItem('customerConnected')
-        router.push('/')
+        
+        // Rediriger vers la page appropriée
+        if (isAdmin) {
+            router.push('/')
+        } else if (isCustomer) {
+            router.push('/customers')
+        } else {
+            router.push('/')
+        }
+        
         alert('Déconnexion réussie.')
     } catch (error) {
         console.error('Erreur lors de la déconnexion :', error)
