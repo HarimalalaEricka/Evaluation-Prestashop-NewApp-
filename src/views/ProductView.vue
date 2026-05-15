@@ -38,6 +38,7 @@ console.log(produits.value)
                     <th>Nom</th>
                     <th>Prix</th>
                     <th>Categorie</th>
+                    <th>Marque</th>
                     <th>Action</th>
                 </tr>
             </thead>
@@ -49,6 +50,7 @@ console.log(produits.value)
                     <td>{{ product.name.language }}</td>
                     <td>{{ (product.price * (1 + product.tax_rate / 100)).toFixed(2) }}</td>
                     <td>{{ product.categorie.language }}</td>
+                    <td>{{ product.marque }}</td>
                     <td><button @click="goToProductDetails(product.id)">Détails</button></td>
                 </tr>
             </tbody>
