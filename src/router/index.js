@@ -10,6 +10,7 @@ import CartView from '../views/CartView.vue'
 import DashboardView from '../views/DashboardView.vue'
 import CustomerView from '../views/CustomerView.vue'
 import CustomerLoginView from '../views/CustomerLoginView.vue'
+import StockView from '../views/StockView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -81,6 +82,13 @@ const router = createRouter({
       path: '/loginCustomer',
       name: 'loginCustomer',
       component: CustomerLoginView,
+      props: true,
+    },
+    {
+      path: '/stock',
+      name: 'stock',
+      component: StockView,
+      meta: { requiresAuth: 'admin' },
       props: true,
     },
   ],

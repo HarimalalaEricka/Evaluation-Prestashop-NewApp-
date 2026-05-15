@@ -25,3 +25,17 @@ SELECT value FROM configuration WHERE name = 'PS_OS_WS_PAYMENT';
 UPDATE configuration
 SET value = 2 -- force le paiement à la livraison
 WHERE name = 'PS_OS_WS_PAYMENT'; 
+
+SELECT 
+  pa.id_product_attribute,
+  pa.reference,
+  pa.price,
+  agl.name as groupe,
+  al.name as valeur
+FROM product_attribute pa
+LEFT JOIN product_attribute_combination pac ON pa.id_product_attribute = pac.id_product_attribute
+LEFT JOIN attribute a ON pac.id_attribute = a.id_attribute
+LEFT JOIN attribute_group ag ON a.id_attribute_group = ag.id_attribute_group
+LEFT JOIN attribute_group_lang agl ON ag.id_attribute_group = agl.id_attribute_group AND agl.id_lang = 1
+LEFT JOIN attribute_lang al ON a.id_attribute = al.id_attribute AND al.id_lang = 1
+WHERE pa.id_product = 1;

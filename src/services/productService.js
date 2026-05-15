@@ -212,3 +212,38 @@ export async function FilterProducts(name, categorie, min_price, max_price)
         return matchesName && matchesCategorie && matchesMinPrice && matchesMaxPrice
     })
 }
+
+export async function getQuantityAvailableByProductId(id_product)
+{
+    if (!id_product) throw new Error('id_product required')
+    try {
+        const stocks = await getRessourceData('stock_availables')
+        for (const stock of stocks) {
+            const stockDetail = await getRessourceItemById('stock_availables', stock.id)
+            if( stockDetail.id_product == id_product && stockDetail.id_product_attribute == '0') {
+                return Number(stockDetail.quantity ?? 0)
+            }
+        }
+        return 0
+    } catch (error) {
+        throw error instanceof Error ? error : new Error(String(error))
+    }
+}
+
+export async function getQuantityAvailableByProductIdAndAttribute(id_product)
+{
+    if (!id_product) throw new Error('id_product required')
+    const quantity = []
+    try{
+        const stocks = await getRessourceData('stock_availables')
+        for (const stock of stocks) {
+            const stockDetail = await getRessourceItemById('stock_availables', stock.id)
+            if( stockDetail.id_product == id_product && stockDetail.id_product_attribute != '0') {
+                quantity.push(stockDetail)
+            }
+        }
+        return quantity
+    }catch (error) {
+        throw error instanceof Error ? error : new Error(String(error))
+    }
+}

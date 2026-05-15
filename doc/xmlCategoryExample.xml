@@ -1,32 +1,31 @@
-<?xml version="1.0" encoding="UTF-8"?>
 <prestashop xmlns:xlink="http://www.w3.org/1999/xlink">
-  <order>
-    <id_address_delivery><![CDATA[5]]></id_address_delivery>
-    <id_address_invoice><![CDATA[5]]></id_address_invoice>
-    <id_cart><![CDATA[12]]></id_cart>
-    <id_currency><![CDATA[1]]></id_currency>
-    <id_lang><![CDATA[1]]></id_lang>
-    <id_customer><![CDATA[1]]></id_customer>
-    <id_carrier><![CDATA[2]]></id_carrier>
-
-    <module><![CDATA[ps_checkpayment]]></module>
-    <payment><![CDATA[Check payment]]></payment>
-
-    <total_paid><![CDATA[49.99]]></total_paid>
-    <total_paid_real><![CDATA[49.99]]></total_paid_real>
-    <total_products><![CDATA[41.66]]></total_products>
-    <total_products_wt><![CDATA[49.99]]></total_products_wt>
-    <conversion_rate><![CDATA[1]]></conversion_rate>
-    <secure_key><![CDATA[c37de238a1cb6dfa738c3b29b804e746]]></secure_key>
-
-    <associations>
-      <order_rows>
-        <order_row>
-          <product_id><![CDATA[19]]></product_id>
-          <product_attribute_id><![CDATA[1]]></product_attribute_id>
-          <product_quantity><![CDATA[1]]></product_quantity>
-        </order_row>
-      </order_rows>
-    </associations>
-  </order>
+  <stock_mvt>
+    <id_product>
+      <![CDATA[20]]>
+    </id_product>
+    <id_product_attribute>
+      <![CDATA[40]]>
+    </id_product_attribute>
+    <id_employee>
+      <![CDATA[2]]>
+    </id_employee>
+    <id_stock>
+      <![CDATA[60]]>
+    </id_stock>
+    <id_stock_mvt_reason>
+      <![CDATA[11]]>
+    </id_stock_mvt_reason>
+    <physical_quantity>
+      <![CDATA[20]]>
+    </physical_quantity>
+    <sign>
+      <![CDATA[1]]>
+    </sign>
+    <price_te>
+      <![CDATA[4]]>
+    </price_te>
+    <date_add>
+      <![CDATA[2024-06-01 12:00:00]]>
+    </date_add>
+  </stock_mvt>
 </prestashop>
