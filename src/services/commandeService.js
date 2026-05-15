@@ -1,0 +1,175 @@
+import { getRessourceData, getRessourceItemById, updateResourceData, getRessourceItemXml, setOrCreateXmlField, getRessourceItemXmlShemaBlank, insertResourceData } from './ressourcesService.js'
+import { getCartProductsByCartId } from './CartService.js'
+import { getRateByTaxRulesGroupId } from './productService.js'
+const DEFAULT_ID_CURRENCY = 1
+const DEFAULT_ID_LANG = 1
+const DEFAULT_MODULE = 'ps_cashondelivery'
+const DEFAULT_ID_CARRIER = 2 // id 2 = livraison gratuite
+const DEFAULT_STATE = 2 // id = 2 => paiement accepté
+
+export async function getAllCommandes()
+{
+    const commandesDetails = []
+    try
+    {
+        const commandes = await getRessourceData('orders')
+        for( const commande of commandes )
+        {
+            if(!commande?.id)
+            {
+                continue
+            }
+            const commandeDetails = await getRessourceItemById('orders', commande.id)
+            const stateDetails = await getRessourceItemById('order_states', commandeDetails.current_state)
+            const stateName = stateDetails?.name
+            commandeDetails.current_state_label =
+                (typeof stateName === 'string' && stateName.trim()) ||
+                (Array.isArray(stateName) && stateName.find((item) => typeof item === 'string' && item.trim())) ||
+                (stateName?.language && String(stateName.language).trim()) ||
+                String(commandeDetails.current_state ?? '').trim()
+
+            const customerDetails = await getRessourceItemById('customers', commandeDetails.id_customer)
+            commandeDetails.customer_name = customerDetails?.lastname 
+
+            const deliveryDetails = await getRessourceItemById('addresses', commandeDetails.id_address_delivery)
+            commandeDetails.city = deliveryDetails?.city 
+
+            commandesDetails.push(commandeDetails)
+        }
+        return commandesDetails
+    }catch (error) {
+        throw error instanceof Error ? error : new Error(String(error))
+    }
+}
+export async function getOrderState()
+{
+    const states = []
+    try
+    {
+        const etats = await getRessourceData('order_states')
+        for( const etat of etats )
+        {
+            if (!etat?.id) {
+                continue
+            }
+
+            const stateDetails = await getRessourceItemById('order_states', etat.id)
+            const stateName = stateDetails?.name
+            const stateLabel =
+                (typeof stateName === 'string' && stateName.trim()) ||
+                (Array.isArray(stateName) && stateName.find((item) => typeof item === 'string' && item.trim())) ||
+                (stateName?.language && String(stateName.language ?? stateName.language).trim()) ||
+                String(etat.id ?? '').trim()
+
+            states.push({
+                id: String(etat.id),
+                name: stateLabel,
+            })
+        }
+        return states
+    } catch(error) {
+        throw error instanceof Error ? error : new Error(String(error))
+    }
+}
+
+export async function changeOrderState(orderId, newStateId) {
+    if (!orderId) throw new Error('orderId required')
+    if (!newStateId) throw new Error('newStateId required')
+
+    // récupérer l'XML complet de la commande et remplacer uniquement current_state
+    const xmlText = await getRessourceItemXml('orders', orderId)
+    const parser = new DOMParser()
+    const xmlDoc = parser.parseFromString(xmlText, 'application/xml')
+
+    const orderNode = xmlDoc.getElementsByTagName('order')[0]
+    if (!orderNode) {
+        throw new Error("order node introuvable dans l'XML récupéré")
+    }
+
+    setOrCreateXmlField(orderNode, 'current_state', String(newStateId), xmlDoc)
+
+    const serializer = new XMLSerializer()
+    const finalXml = serializer.serializeToString(xmlDoc)
+
+    return await updateResourceData('orders', orderId, finalXml)
+}
+
+export async function insertOrder(id_cart)
+{
+    if (!id_cart) {
+        throw new Error('id_cart is required')
+    }
+
+    const blankOrderXml = await getRessourceItemXmlShemaBlank('orders')
+    const cart = await getRessourceItemById('carts', id_cart)
+    const cartProducts = await getCartProductsByCartId(id_cart)
+    let total_paid = 0  //ttc avec ou sans remise
+    let total_products = 0 // ht avec ou sans remise
+
+    const parser = new DOMParser()
+    const xmlDoc = parser.parseFromString(blankOrderXml, 'application/xml')
+
+    const orderNode = xmlDoc.getElementsByTagName('order')[0]
+    if (!orderNode) {
+        throw new Error('Invalid order XML schema')
+    }
+
+    // Champs obligatoires
+    setOrCreateXmlField(orderNode, 'id_lang', String(DEFAULT_ID_LANG), xmlDoc)
+    setOrCreateXmlField(orderNode, 'id_currency', String(DEFAULT_ID_CURRENCY), xmlDoc)
+    setOrCreateXmlField(orderNode, 'id_customer', String(cart.id_customer), xmlDoc)
+    setOrCreateXmlField(orderNode, 'id_address_delivery', String(cart.id_address_delivery), xmlDoc)
+    setOrCreateXmlField(orderNode, 'id_address_invoice', String(cart.id_address_invoice), xmlDoc)
+    setOrCreateXmlField(orderNode, 'id_cart', String(id_cart), xmlDoc)
+    setOrCreateXmlField(orderNode, 'id_carrier', DEFAULT_ID_CARRIER, xmlDoc)
+    setOrCreateXmlField(orderNode, 'current_state', DEFAULT_STATE, xmlDoc)
+    setOrCreateXmlField(orderNode, 'secure_key', cart.secure_key, xmlDoc)
+
+    setOrCreateXmlField(orderNode, 'module', DEFAULT_MODULE, xmlDoc)
+    setOrCreateXmlField(orderNode, 'payment', 'Paiement comptant à la livraison (Cash on delivery)', xmlDoc)
+
+    // Order rows - créer une ligne par produit
+    const firstOrderRow = orderNode.getElementsByTagName('order_row')[0]
+    const orderRowsContainer = firstOrderRow?.parentNode
+    
+    for (let i = 0; i < cartProducts.length; i++) {
+        const product = cartProducts[i]
+        const produit = await getRessourceItemById('products', product.id_product)
+        let ht = parseFloat(produit.price) * product.quantity // ht 
+        const rate = await getRateByTaxRulesGroupId(produit.id_tax_rules_group)
+        let ttc = ht * (1 + rate / 100); 
+        
+        // Cloner la première row pour les produits suivants
+        let orderRow = firstOrderRow
+        if (i > 0 && orderRowsContainer) {
+            orderRow = firstOrderRow.cloneNode(true)
+            orderRowsContainer.appendChild(orderRow)
+        }
+        
+        setOrCreateXmlField(orderRow, 'product_id', String(product.id_product), xmlDoc)
+        setOrCreateXmlField(orderRow, 'product_attribute_id', String(product.id_product_attribute), xmlDoc)
+        setOrCreateXmlField(orderRow, 'product_quantity', String(product.quantity), xmlDoc)
+        setOrCreateXmlField(orderRow, 'product_name', String(produit.name), xmlDoc)
+        setOrCreateXmlField(orderRow, 'product_reference', String(produit.reference), xmlDoc)
+        total_paid += ttc
+        total_products += ht
+    }
+
+    setOrCreateXmlField(orderNode, 'total_paid', String(total_paid), xmlDoc) 
+    setOrCreateXmlField(orderNode, 'total_paid_real', String(total_paid), xmlDoc) // mitovy amle total_paid ihany satria efa paiement accepté par defaut
+
+    setOrCreateXmlField(orderNode, 'total_products', String(total_products), xmlDoc) 
+    setOrCreateXmlField(orderNode, 'total_products_wt', String(total_paid), xmlDoc) // mitovy amle total_paid ihany satria ity ilay prix total avec taxe
+
+    setOrCreateXmlField(orderNode, 'conversion_rate', '1', xmlDoc)
+
+    const serializer = new XMLSerializer()
+    const finalXml = serializer.serializeToString(xmlDoc)
+    
+    console.log('XML envoyé pour création de commande:', finalXml.substring(0, 1000))
+    const result = await insertResourceData('orders', finalXml)
+    // console.log('Commande créée:', result)
+    
+    return result
+    // return await insertResourceData('orders', finalXml)
+}
