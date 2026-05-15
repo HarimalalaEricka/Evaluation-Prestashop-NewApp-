@@ -28,7 +28,9 @@ function singularizeResourceName(pluralName) {
         categories: 'category',
         categoriess: 'category',
         order_states: 'order_state',
-        tax_rules: 'tax_rule'
+        tax_rules: 'tax_rule',
+        stock_availables: 'stock_available',
+        product_option_values: 'product_option_value',
     }
 
     if (specialCases[pluralName]) {

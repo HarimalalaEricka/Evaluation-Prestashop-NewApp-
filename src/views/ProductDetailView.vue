@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getRessourceItemById } from '../services/ressourcesService.js'
 import { addCart, updateCart, getCartByCustomerId } from '../services/CartService.js'
+import { getQuantityAvailableByProductId, getQuantityAvailableByProductIdAndAttribute } from '../services/productService.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -12,6 +13,8 @@ const error = ref('')
 const quantity = ref(1)
 const id_customer = 2 // TODO: get from auth context when implemented
 const carts = ref([])
+const quantityAvailable = ref(0)
+const quantityAvailableAttribute = ref([])
 
 async function fetchProduct() {
     const productId = route.params.id
@@ -27,6 +30,9 @@ async function fetchProduct() {
     try {
         product.value = await getRessourceItemById('products', productId)
         carts.value = await getCartByCustomerId(id_customer)
+        quantityAvailable.value = await getQuantityAvailableByProductId(productId)
+        quantityAvailableAttribute.value = await getQuantityAvailableByProductIdAndAttribute(productId)
+        console.log(quantityAvailableAttribute.value)
 
         if (carts.value && carts.value.id) {
             localStorage.setItem('customerCart', String(carts.value.id))
@@ -88,9 +94,31 @@ onMounted(() => {
             <p><strong>Description :</strong> <span v-html="product.description_short?.language || product.description_short"></span></p>
             <p><strong>Prix :</strong> {{ product.price }}</p>
             <p><strong>État :</strong> {{ product.active }}</p>
+            <p><strong>Quantité disponible :</strong> {{ quantityAvailable }}</p>
             <label for="quantity">Quantité :</label>
             <input type="number" id="quantity" v-model.number="quantity" min="1" step="1" />
             <button @click="ajouterPanier">Ajouter au panier</button>
+        </div>
+        <div>
+            <table border="1">
+                <thead>
+                    <tr>
+                        <th>Stock ID</th>
+                        <th>Groupe</th>
+                        <th>Valeur</th>
+                        <th>Stock disponible</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    <tr v-for="quantity in quantityAvailableAttribute" :key="quantity.id">
+                        <td>{{ quantity.id }}</td>
+                        <td>groupe</td>
+                        <td>valeur</td>
+                        <td>{{ quantity.quantity }}</td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
     </div>
 </template>

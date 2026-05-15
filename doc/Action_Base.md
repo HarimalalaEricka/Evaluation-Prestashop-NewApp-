@@ -60,3 +60,26 @@ bouton commander
         product_id
         product_attribute_id
         product_quantity
+
+stock 
+Principales tables impactées
+
+    ps_stock_available : mise à jour de la quantité affichée (champ quantity) pour id_product / id_product_attribute / id_shop.
+    ps_stock : (Advanced stock) insertion / mise à jour d'une ligne par entrepôt (quantité physique par id_warehouse).
+    ps_stock_mvt : enregistrement d’un mouvement de stock (entrées/sorties) avec raison (id_stock_mvt_reason), date et qty.
+    ps_supply_order / ps_supply_order_detail : si l’ajout provient d’une commande fournisseur, ces tables reçoivent des lignes.
+    ps_warehouse_product_location : éventuellement mise à jour si on précise l’emplacement dans l’entrepôt.
+    ps_stock_mvt_reason : peut être lu pour la raison; de nouvelles raisons rarement insérées ici.
+    (Remarques) aucune colonne quantity fiable dans ps_product — PrestaShop utilise ps_stock_available comme source d’état.
+    Principales fonctions/classes appelées
+
+    Validation de la source (BO, import, webservice, réception fournisseur).
+    Calcul et application du delta : quantity_new = quantity_old + delta.
+    INSERT/UPDATE sur ps_stock (advanced) et INSERT dans ps_stock_mvt (mouvement).
+    UPDATE sur ps_stock_available.quantity.
+    Si produit a combinaisons : la mise à jour cible id_product_attribute spécifique.
+    Si multi-boutiques : la mise à jour peut être scoped par id_shop / id_shop_group.
+    Emission de hooks/events (ex. actionUpdateQuantity ou hooks liés aux mouvements de stock) pour modules tiers.
+    Mise à jour du cache / éventuelle régénération d’index si un module l’exige.
+
+    API: seule stock_available accessible en POST et PUT

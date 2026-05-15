@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getAllProducts } from '../services/productService.js'
+import RechercheProduct from '../components/RechercheProduct.vue'
 
 const produits = ref([])
 const router = useRouter()
@@ -19,6 +20,10 @@ function goToProductDetails(productId) {
     router.push({ name: 'product-detail', params: { id: productId } })
 }
 
+function updateProductsList(newProducts) {
+    produits.value = newProducts
+}
+
 onMounted(() => {
     fetchProduits()
 })
@@ -29,6 +34,7 @@ console.log(produits.value)
 <template>
     <div>
         <h1>Produits</h1>
+        <RechercheProduct @update-products="updateProductsList" />
 
         <table border="1">
             <thead>
@@ -38,6 +44,7 @@ console.log(produits.value)
                     <th>Nom</th>
                     <th>Prix</th>
                     <th>Categorie</th>
+                    <th>Marque</th>
                     <th>Action</th>
                 </tr>
             </thead>
@@ -49,6 +56,7 @@ console.log(produits.value)
                     <td>{{ product.name.language }}</td>
                     <td>{{ (product.price * (1 + product.tax_rate / 100)).toFixed(2) }}</td>
                     <td>{{ product.categorie.language }}</td>
+                    <td>{{ product.marque }}</td>
                     <td><button @click="goToProductDetails(product.id)">Détails</button></td>
                 </tr>
             </tbody>
