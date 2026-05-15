@@ -19,3 +19,9 @@ SELECT p.`id_product`, p.`reference`, p.`id_shop_default`, ps.`price` AS `price_
             AND sa.`id_product_attribute` = 0
          AND sa.`id_shop` = 1 LEFT JOIN ps_category_lang cl ON cl.`id_category` = ps.`id_category_default` AND cl.`id_lang` = 1 AND cl.`id_shop` = 1 LEFT JOIN ps_image_shop img_shop ON img_shop.`id_product` = ps.`id_product` AND img_shop.`cover` = 1 AND img_shop.`id_shop` = 1 LEFT JOIN ps_image_lang img_lang ON img_shop.`id_image` = img_lang.`id_image` AND img_lang.`id_lang` = 1 WHERE p.`state` = 1 ORDER BY id_product desc LIMIT 20
          
+
+SELECT value FROM configuration WHERE name = 'PS_OS_WS_PAYMENT';
+
+UPDATE configuration
+SET value = 2 -- force le paiement à la livraison
+WHERE name = 'PS_OS_WS_PAYMENT'; 

@@ -1,22 +1,32 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <prestashop xmlns:xlink="http://www.w3.org/1999/xlink">
-  <category>
-    <id_parent><![CDATA[0]]></id_parent>
+  <order>
+    <id_address_delivery><![CDATA[5]]></id_address_delivery>
+    <id_address_invoice><![CDATA[5]]></id_address_invoice>
+    <id_cart><![CDATA[12]]></id_cart>
+    <id_currency><![CDATA[1]]></id_currency>
+    <id_lang><![CDATA[1]]></id_lang>
+    <id_customer><![CDATA[1]]></id_customer>
+    <id_carrier><![CDATA[2]]></id_carrier>
 
-    <active><![CDATA[1]]></active>
+    <module><![CDATA[ps_checkpayment]]></module>
+    <payment><![CDATA[Check payment]]></payment>
 
-    <nom>
-      <language id="1"><![CDATA[Homme]]></language>
-    </nom>
+    <total_paid><![CDATA[49.99]]></total_paid>
+    <total_paid_real><![CDATA[49.99]]></total_paid_real>
+    <total_products><![CDATA[41.66]]></total_products>
+    <total_products_wt><![CDATA[49.99]]></total_products_wt>
+    <conversion_rate><![CDATA[1]]></conversion_rate>
+    <secure_key><![CDATA[c37de238a1cb6dfa738c3b29b804e746]]></secure_key>
 
-    <link_rewrite>
-      <language id="1"><![CDATA[homme]]></language>
-    </link_rewrite>
-
-    <description>
-      <language id="1"><![CDATA[Catégorie Homme]]></language>
-    </description>
-
-    <id_shop_default><![CDATA[1]]></id_shop_default>
-  </category>
+    <associations>
+      <order_rows>
+        <order_row>
+          <product_id><![CDATA[19]]></product_id>
+          <product_attribute_id><![CDATA[1]]></product_attribute_id>
+          <product_quantity><![CDATA[1]]></product_quantity>
+        </order_row>
+      </order_rows>
+    </associations>
+  </order>
 </prestashop>

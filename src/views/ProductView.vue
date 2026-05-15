@@ -46,9 +46,9 @@ console.log(produits.value)
                 <tr v-for="product in produits" :key="product.id">
                     <td>{{ product.id }}</td>
                     <td>{{ product.reference }}</td>
-                    <td>{{ product.name.language[0] }}</td>
-                    <td>{{ product.price }}</td>
-                    <td>{{ product.categorie.language[0] }}</td>
+                    <td>{{ product.name.language }}</td>
+                    <td>{{ (product.price * (1 + product.tax_rate / 100)).toFixed(2) }}</td>
+                    <td>{{ product.categorie.language }}</td>
                     <td><button @click="goToProductDetails(product.id)">Détails</button></td>
                 </tr>
             </tbody>

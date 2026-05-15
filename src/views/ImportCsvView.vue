@@ -1,7 +1,7 @@
 <script>
 import Papa from 'papaparse';
-import { getRessourceData, getRessources, getRessourceSchema, convertRowsToIndividualXml, updateResourceData } from '../services/ressourcesService.js'
-import { ensureSimpleProductStock, forceProductCombinationMode, getCategoryNameLookup, getTaxRulesGroupRateLookup, getTaxRuleGroupsByRateLookup, importCustomerOrders, insertResourceData, prepareRowsForProductImport, prepareVariantImportOperations, upsertStockAvailable } from '../services/importService.js'
+import { getRessourceData, getRessources, getRessourceSchema, convertRowsToIndividualXml, updateResourceData, insertResourceData } from '../services/ressourcesService.js'
+import { ensureSimpleProductStock, forceProductCombinationMode, getCategoryNameLookup, getTaxRulesGroupRateLookup, getTaxRuleGroupsByRateLookup, importCustomerOrders, prepareRowsForProductImport, prepareVariantImportOperations, upsertStockAvailable } from '../services/importService.js'
 
 export default {
     data() {
