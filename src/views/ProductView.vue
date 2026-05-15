@@ -20,6 +20,10 @@ function goToProductDetails(productId) {
     router.push({ name: 'product-detail', params: { id: productId } })
 }
 
+function updateProductsList(newProducts) {
+    produits.value = newProducts
+}
+
 onMounted(() => {
     fetchProduits()
 })
@@ -30,7 +34,7 @@ console.log(produits.value)
 <template>
     <div>
         <h1>Produits</h1>
-        <RechercheProduct />
+        <RechercheProduct @update-products="updateProductsList" />
 
         <table border="1">
             <thead>

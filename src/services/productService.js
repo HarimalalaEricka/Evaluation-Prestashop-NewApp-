@@ -1,6 +1,11 @@
 import { getRessourceData, getRessourceItemById } from './ressourcesService.js'
 const ID_COUNTRY = import.meta.env.VITE_ID_COUNTRY
 
+const categoryCache = new Map()
+const taxRulesListCache = new Map()
+const taxRuleCache = new Map()
+const taxRateCache = new Map()
+
 function normalizeText(value) {
     return String(value ?? '').trim().toLowerCase()
 }
@@ -30,26 +35,64 @@ function getProductPriceWithTax(product) {
     return basePrice * (1 + taxRate / 100)
 }
 
+function getMarqueFromAvailabilityDate(availableDate) {
+    if (!availableDate || availableDate === '0000-00-00') {
+        return ''
+    }
+
+    const today = new Date()
+    const yesterday = new Date(today)
+    const sevenDaysAgo = new Date(today)
+
+    yesterday.setDate(yesterday.getDate() - 1)
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+
+    const todayStr = today.toISOString().split('T')[0]
+    const yesterdayStr = yesterday.toISOString().split('T')[0]
+    const sevenDaysAgoStr = sevenDaysAgo.toISOString().split('T')[0]
+
+    if (availableDate >= yesterdayStr && availableDate <= todayStr) {
+        return 'HOT'
+    }
+
+    if (availableDate > sevenDaysAgoStr && availableDate < yesterdayStr) {
+        return 'NEW'
+    }
+
+    return ''
+}
+
+async function getCategoryById(categoryId) {
+    if (!categoryId) {
+        return null
+    }
+
+    if (categoryCache.has(String(categoryId))) {
+        return categoryCache.get(String(categoryId))
+    }
+
+    const category = await getRessourceItemById('categories', categoryId)
+    categoryCache.set(String(categoryId), category)
+    return category
+}
+
 export async function getAllProducts() {
-    const productsDetails = []
     try {
         const products = await getRessourceData('products')
 
+        const productsDetails = []
         for (const product of products) {
             if (!product?.id) continue
 
             const productDetails = await getRessourceItemById('products', product.id)
 
             if (productDetails?.id_category_default) {
-                const categorieDetail = await getRessourceItemById('categories',productDetails.id_category_default)
-                productDetails.categorie = categorieDetail?.name
+                const categorieDetail = await getCategoryById(productDetails.id_category_default)
+                productDetails.categorie = categorieDetail?.name ?? null
             }
 
-            const rate = await getRateByTaxRulesGroupId(productDetails.id_tax_rules_group)
-            productDetails.tax_rate = rate
-
-            const marque = await getMarqueByProductId(productDetails.id)
-            productDetails.marque = marque
+            productDetails.tax_rate = await getRateByTaxRulesGroupId(productDetails.id_tax_rules_group)
+            productDetails.marque = getMarqueFromAvailabilityDate(productDetails.available_date)
 
             productsDetails.push(productDetails)
         }
@@ -62,13 +105,21 @@ export async function getAllProducts() {
 
 export async function getRateByTaxRulesGroupId(id_tax_rules_group) {
     if (!id_tax_rules_group) throw new Error('id_tax_rules_group required')
+
+    const cacheKey = `group:${id_tax_rules_group}`
+    if (taxRateCache.has(cacheKey)) {
+        return taxRateCache.get(cacheKey)
+    }
+
     try {
         const taxRule = await getTaxRuleByTaxRulesGroupId(id_tax_rules_group)
         if (!taxRule) {
             console.log('Tax rule not found for group', id_tax_rules_group)
+            taxRateCache.set(cacheKey, 0)
             return 0
         }
         const rate = await getRateByTaxRule(taxRule)
+        taxRateCache.set(cacheKey, rate)
         return rate
     } catch (error) {
         throw error instanceof Error? error: new Error(String(error))
@@ -77,14 +128,27 @@ export async function getRateByTaxRulesGroupId(id_tax_rules_group) {
 
 export async function getTaxRuleByTaxRulesGroupId(id_tax_rules_group, id_country = ID_COUNTRY) {
     if (!id_tax_rules_group) throw new Error('id_tax_rules_group required')
+
+    const cacheKey = `rule:${id_tax_rules_group}:${id_country}`
+    if (taxRuleCache.has(cacheKey)) {
+        return taxRuleCache.get(cacheKey)
+    }
+
     try {
-        const taxRules = await getRessourceData('tax_rules')
+        let taxRules = taxRulesListCache.get('tax_rules')
+        if (!taxRules) {
+            taxRules = await getRessourceData('tax_rules')
+            taxRulesListCache.set('tax_rules', taxRules)
+        }
+
         for( const taxRule of taxRules) {
             const taxRuleDetails = await getRessourceItemById('tax_rules', taxRule.id)
             if (String(taxRuleDetails.id_tax_rules_group) === String(id_tax_rules_group) && String(taxRuleDetails.id_country) === String(id_country)) {
+                taxRuleCache.set(cacheKey, taxRuleDetails)
                 return taxRuleDetails
             }
         }
+        taxRuleCache.set(cacheKey, null)
         return null
     } catch (error) {
         throw error instanceof Error? error: new Error(String(error))
@@ -93,47 +157,37 @@ export async function getTaxRuleByTaxRulesGroupId(id_tax_rules_group, id_country
 
 export async function getRateByTaxRule( taxRule ){
     if (!taxRule) throw new Error('taxRule required')
+
+    const cacheKey = `tax:${taxRule.id_tax}`
+    if (taxRateCache.has(cacheKey)) {
+        return taxRateCache.get(cacheKey)
+    }
+
     try {
         const tax = await getRessourceItemById('taxes', taxRule.id_tax)
         if (tax && tax.rate) {
-            return Number(tax.rate)
+            const rate = Number(tax.rate)
+            taxRateCache.set(cacheKey, rate)
+            return rate
         }
+        taxRateCache.set(cacheKey, 2)
         return 2
     } catch (error) {
         throw error instanceof Error? error: new Error(String(error))
     }
 }
 
-export async function getMarqueByProductId(id_product) 
+export async function getMarqueByProductId(id_product, availableDate = null) 
 {
     if (!id_product) throw new Error('id_product required')
     
     try {
-        const product = await getRessourceItemById('products', id_product)
-        const date_availability = product.available_date
-        
-        if (date_availability && date_availability !== '0000-00-00') {
-            const today = new Date()
-            const yesterday = new Date(today)
-            const sevenDaysAgo = new Date(today)
-            
-            yesterday.setDate(yesterday.getDate() - 1)
-            sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-            
-            const todayStr = today.toISOString().split('T')[0]
-            const yesterdayStr = yesterday.toISOString().split('T')[0]
-            const sevenDaysAgoStr = sevenDaysAgo.toISOString().split('T')[0]
-            
-            if (date_availability >= yesterdayStr && date_availability <= todayStr) {
-                return 'HOT'
-            }
-            
-            if (date_availability > sevenDaysAgoStr && date_availability < yesterdayStr) {
-                return 'NEW'
-            }
+        if (availableDate) {
+            return getMarqueFromAvailabilityDate(availableDate)
         }
-        
-        return ''
+
+        const product = await getRessourceItemById('products', id_product)
+        return getMarqueFromAvailabilityDate(product?.available_date)
     } catch (error) {
         throw error instanceof Error? error: new Error(String(error))
     }
@@ -143,12 +197,12 @@ export async function getMarqueByProductId(id_product)
 export async function FilterProducts(name, categorie, min_price, max_price)
 {
     const allProducts = await getAllProducts()
-    return allProducts.filter(async (product) => {
-        const productName = normalizeText(getMultilingualText(product.name.language))
-        const categorieDetails = await getRessourceItemById('categories', product.associations.categories.category[0].id)
-        const productCategorie = normalizeText(getMultilingualText(categorieDetails.name.language))
-        const searchName = normalizeText(name)
-        const searchCategorie = normalizeText(categorie)
+    const searchName = normalizeText(name)
+    const searchCategorie = normalizeText(categorie)
+
+    return allProducts.filter((product) => {
+        const productName = normalizeText(getMultilingualText(product?.name))
+        const productCategorie = normalizeText(getMultilingualText(product?.categorie))
         const priceWithTax = getProductPriceWithTax(product)
 
         const matchesName = searchName ? productName.includes(searchName) : true
