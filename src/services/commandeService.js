@@ -173,3 +173,67 @@ export async function insertOrder(id_cart)
     return result
     // return await insertResourceData('orders', finalXml)
 }
+
+export async function SumOrdersGroupByDate()
+{
+    const commandes = await getRessourceData('orders')
+    const groupedByDate = {}
+    
+    try {
+        for (const commande of commandes) {
+            if (!commande?.id) {
+                continue
+            }
+            
+            const commandeDetails = await getRessourceItemById('orders', commande.id)
+            // Extraire la date de création de la commande
+            const dateKey = commandeDetails.date_add ? new Date(commandeDetails.date_add).toISOString().split('T')[0] : null
+            
+            if (!dateKey) {
+                continue
+            }
+            
+            if (!groupedByDate[dateKey]) {
+                groupedByDate[dateKey] = {
+                    date: dateKey,
+                    total_orders: 0,
+                    total_amount: 0
+                }
+            }
+
+            groupedByDate[dateKey].total_orders += 1
+            groupedByDate[dateKey].total_amount += Number(commandeDetails.total_paid ?? 0)
+        }
+        
+        // Retourner un tableau trié par date
+        return Object.values(groupedByDate).sort((a, b) => new Date(a.date) - new Date(b.date))
+    } catch (error) {
+        throw error instanceof Error ? error : new Error(String(error))
+    }
+}
+
+export async function SumOrders()
+{
+    const commandes = await SumOrdersGroupByDate()
+    let total_orders = 0
+    let total_amount = 0
+    for( const commande of commandes)
+    {
+        total_orders += commande.total_orders
+        total_amount += commande.total_amount
+    }
+    return {
+        total_orders,
+        total_amount
+    }
+}
+
+export async function FilterSumByDate(date_debut, date_fin)
+{
+    const commandes = await SumOrdersGroupByDate()
+    const filtered = commandes.filter(commande => {
+        const commandeDate = new Date(commande.date)
+        return (!date_debut || commandeDate >= new Date(date_debut)) && (!date_fin || commandeDate <= new Date(date_fin))
+    })
+    return filtered
+}

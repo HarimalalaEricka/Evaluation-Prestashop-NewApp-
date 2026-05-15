@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { checkLogin } from '../services/loginService.js'
 
 const router = useRouter()
-const customerConnected = ref(null)
+const userConnected = ref(null)
 const email = ref('nam@gmail.com')
 const password = ref('nam')
 
@@ -12,11 +12,11 @@ async function Connect() {
     try {
         const result = await checkLogin(email.value, password.value)
         if (result) {
-            customerConnected.value = result
+            userConnected.value = result
 
             // stockage dans session
             localStorage.setItem(
-                'customerConnected',
+                'userConnected',
                 JSON.stringify(result)
             )
             //redirection
