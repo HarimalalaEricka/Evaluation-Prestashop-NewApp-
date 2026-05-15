@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getAllProducts } from '../services/productService.js'
+import RechercheProduct from '../components/RechercheProduct.vue'
 
 const produits = ref([])
 const router = useRouter()
@@ -29,6 +30,7 @@ console.log(produits.value)
 <template>
     <div>
         <h1>Produits</h1>
+        <RechercheProduct />
 
         <table border="1">
             <thead>

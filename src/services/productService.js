@@ -1,6 +1,35 @@
 import { getRessourceData, getRessourceItemById } from './ressourcesService.js'
 const ID_COUNTRY = import.meta.env.VITE_ID_COUNTRY
 
+function normalizeText(value) {
+    return String(value ?? '').trim().toLowerCase()
+}
+
+function getMultilingualText(value) {
+    if (!value) return ''
+
+    if (typeof value === 'string') {
+        return value
+    }
+
+    if (Array.isArray(value)) {
+        const firstText = value.find((item) => typeof item === 'string' && item.trim())
+        return firstText ?? ''
+    }
+
+    if (typeof value === 'object') {
+        return value.language ?? value[1] ?? value.value ?? ''
+    }
+
+    return String(value)
+}
+
+function getProductPriceWithTax(product) {
+    const basePrice = Number(product?.price ?? 0)
+    const taxRate = Number(product?.tax_rate ?? 0)
+    return basePrice * (1 + taxRate / 100)
+}
+
 export async function getAllProducts() {
     const productsDetails = []
     try {
@@ -108,4 +137,24 @@ export async function getMarqueByProductId(id_product)
     } catch (error) {
         throw error instanceof Error? error: new Error(String(error))
     }
+}
+
+
+export async function FilterProducts(name, categorie, min_price, max_price)
+{
+    const allProducts = await getAllProducts()
+    return allProducts.filter(async (product) => {
+        const productName = normalizeText(getMultilingualText(product.name.language))
+        const categorieDetails = await getRessourceItemById('categories', product.associations.categories.category[0].id)
+        const productCategorie = normalizeText(getMultilingualText(categorieDetails.name.language))
+        const searchName = normalizeText(name)
+        const searchCategorie = normalizeText(categorie)
+        const priceWithTax = getProductPriceWithTax(product)
+
+        const matchesName = searchName ? productName.includes(searchName) : true
+        const matchesCategorie = searchCategorie ? productCategorie.includes(searchCategorie) : true
+        const matchesMinPrice = min_price != null ? priceWithTax >= Number(min_price) : true
+        const matchesMaxPrice = max_price != null ? priceWithTax <= Number(max_price) : true
+        return matchesName && matchesCategorie && matchesMinPrice && matchesMaxPrice
+    })
 }
