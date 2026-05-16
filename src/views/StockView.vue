@@ -1,7 +1,9 @@
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { getAllStocks, updateStock } from '../services/stockService.js'
 
+const router = useRouter()
 const stocks = ref([])
 const loading = ref(false)
 const message = ref('')
@@ -42,6 +44,10 @@ async function handleUpdateStock(stock) {
     }
 }
 
+function gotoEvolution(id_product) {
+    router.push({ name: 'stockSummary', query: { id_product } })
+}
+
 onMounted(() => {
     fetchStocks()
 })
@@ -69,7 +75,10 @@ onMounted(() => {
                     <td>{{ stock.product_name }}</td>
                     <td>{{ stock.quantity }}</td>
                     <td><input type="number" v-model.number="stock.newQuantity" :disabled="loading" /></td>
-                    <td><button @click="handleUpdateStock(stock)" :disabled="loading">Update</button></td>
+                    <td>
+                        <button @click="handleUpdateStock(stock)" :disabled="loading">Update</button>
+                        <button @click="gotoEvolution(stock.id_product)" :disabled="loading">Évolution</button>
+                    </td>
                 </tr>
             </tbody>
             

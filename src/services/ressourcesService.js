@@ -31,6 +31,7 @@ function singularizeResourceName(pluralName) {
         tax_rules: 'tax_rule',
         stock_availables: 'stock_available',
         product_option_values: 'product_option_value',
+        stock_movements: 'stock_mvt',
     }
 
     if (specialCases[pluralName]) {
@@ -749,7 +750,7 @@ export async function getRessourceItemById(resourceName, id) {
     }, REQUEST_TIMEOUT_MS)
 
     try {
-        const res = await fetch(`${BASE_URL}/${resourceName}/${id}`, {
+        const res = await fetch(`${BASE_URL}/${resourceName}/${id}?display=full`, {
             headers: getAuthHeaders(),
             signal: controller.signal
         })

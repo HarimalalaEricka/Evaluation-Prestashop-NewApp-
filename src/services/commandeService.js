@@ -61,10 +61,12 @@ export async function getOrderState()
                 (stateName?.language && String(stateName.language ?? stateName.language).trim()) ||
                 String(etat.id ?? '').trim()
 
-            states.push({
-                id: String(etat.id),
-                name: stateLabel,
-            })
+            if (stateLabel === 'Paiement accepté' || stateLabel === 'Annulé') {
+                states.push({
+                    id: String(etat.id),
+                    name: stateLabel,
+                })
+            }
         }
         return states
     } catch(error) {
