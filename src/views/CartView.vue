@@ -3,10 +3,24 @@ import { ref, onMounted, computed } from 'vue'
 import { getCartByCustomerId } from '../services/CartService.js'
 import { insertOrder } from '../services/commandeService.js'
 
-const idCustomer = 2
+const idCustomer = getCustomerId()
 const cart = ref(null)
 const loading = ref(false)
 const error = ref('')
+
+function getCustomerId() {
+  const customerConnected = localStorage.getItem('customerConnected')
+
+  if (!customerConnected) return 0
+
+  try {
+    const customer = JSON.parse(customerConnected)
+    return Number(customer?.id ?? 0)
+  } catch (error) {
+    console.error('Impossible de lire customerConnected:', error)
+    return 0
+  }
+}
 
 const rows = computed(() => {
   if (!cart.value || !cart.value.associations) return []
@@ -35,6 +49,7 @@ async function fetchCart() {
   try {
     cart.value = await getCartByCustomerId(idCustomer)
     console.log('Cart data:', cart.value)
+    console.log('Customer id:', idCustomer)
   } catch (err) {
     error.value = err instanceof Error ? err.message : String(err)
   } finally {

@@ -81,7 +81,28 @@ export async function updateCart(cartId, productId, qty)
     // return finalXml
     return await updateResourceData('carts', cartId, finalXml)
 }
+// export async function updateQuantityCart(cartId, productId, qty)
+// {
+//     if (!cartId) throw new Error('cartId is required')
+//     if (!productId || !qty) {
+//         throw new Error('productId and qty are required')
+//     }
+//     const CartXml = await getRessourceItemXml('carts', cartId)
 
+//     const parser = new DOMParser()
+//     const xmlDoc = parser.parseFromString(CartXml, 'application/xml')
+
+//     const cartNode = xmlDoc.getElementsByTagName('cart')[0]
+//     if (!cartNode) {
+//         throw new Error('Invalid cart XML schema')
+//     }
+//     setOrCreateXmlField(cartNode, 'id', String(cartId), xmlDoc)
+//     const cartRowsNode = cartNode.getElementsByTagName('cart_rows')[0]
+//     if (!cartRowsNode) {
+//         throw new Error('No cart_rows found in cart XML')
+//     }
+
+// }
 
 export async function getCartByCustomerId(id_customer) {
     if (!id_customer) throw new Error('id_customer required')
@@ -92,8 +113,8 @@ export async function getCartByCustomerId(id_customer) {
         const carts = await getRessourceData('carts')
         const cartsDetails = await Promise.all(carts.map((cart) => getRessourceItemById('carts', cart.id)))
 
-        // Filter by customer and guest (id_guest != 0)
-        let candidateCarts = cartsDetails.filter((cart) => String(cart.id_customer) === String(id_customer) && String(cart.id_guest) !== '0')
+        // Filter by customer only
+        let candidateCarts = cartsDetails.filter((cart) => String(cart.id_customer) === String(id_customer))
 
         if (candidateCarts.length === 0) return null
 
