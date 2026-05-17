@@ -12,6 +12,7 @@ import CustomerView from '../views/CustomerView.vue'
 import CustomerLoginView from '../views/CustomerLoginView.vue'
 import StockView from '../views/StockView.vue'
 import StockSummaryView from '../views/StockSummaryView.vue'
+import OrderHistoryView from '../views/OrderHistoryView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -35,7 +36,7 @@ const router = createRouter({
       meta: { requiresAuth: 'admin' },
     },
     {
-      path: '/',
+      path: '/loginBO',
       name: 'login',
       component: LoginView,
     },
@@ -49,20 +50,20 @@ const router = createRouter({
       path: '/products',
       name: 'products',
       component: ProductView,
-      meta: { requiresAuth: 'customer' },
+      meta: { requiresAuth: 'customer', allowGuest: true },
     },
     {
       path: '/products/:id',
       name: 'product-detail',
       component: ProductDetailView,
-      meta: { requiresAuth: 'customer' },
+      meta: { requiresAuth: 'customer', allowGuest: true },
       props: true,
     },
     {
       path: '/cart',
       name: 'cart',
       component: CartView,
-      meta: { requiresAuth: 'customer' },
+      meta: { requiresAuth: 'customer', allowGuest: true },
       props: true,
     },
     {
@@ -73,10 +74,9 @@ const router = createRouter({
       props: true,
     },
     {
-      path: '/customers',
+      path: '/',
       name: 'customers',
       component: CustomerView,
-      meta: { requiresAuth: 'admin' },
       props: true,
     },
     {
@@ -99,28 +99,62 @@ const router = createRouter({
       meta: { requiresAuth: 'admin' },
       props: true,
     },
+    {
+      path: '/orderHistory',
+      name: 'orderHistory',
+      component: OrderHistoryView,
+      // order history should be only for logged customers (not guests)
+      meta: { requiresAuth: 'customer', allowGuest: false },
+      props: true,
+    },
   ],
 })
 
 
 router.beforeEach((to, from) => {
-  const admin = localStorage.getItem('userConnected')
-  const customer = localStorage.getItem('customerConnected')
+  const adminRaw = localStorage.getItem('userConnected')
+  const guestRaw = localStorage.getItem('guest')
+  const customerRaw = localStorage.getItem('customerConnected')
+
+  const admin = Boolean(adminRaw)
+
+  let guestSession = null
+  let customerSession = null
+  try {
+    guestSession = guestRaw ? JSON.parse(guestRaw) : null
+  } catch (e) {
+    guestSession = null
+  }
+
+  try {
+    customerSession = customerRaw ? JSON.parse(customerRaw) : null
+  } catch (e) {
+    customerSession = null
+  }
+
+  const guest = Boolean(guestSession)
+  const customer = Boolean(customerSession)
 
   // Le meta `requiresAuth` peut être:
   // - undefined / falsy: pas d'auth requise
   // - true: accepter admin OU customer
   // - 'admin' : seulement admin
-  // - 'customer' : seulement customer
+  // - 'customer' : seulement customer (guest est une sous-catégorie)
   const required = to.meta.requiresAuth
+  const allowGuest = Boolean(to.meta.allowGuest)
 
   if (required === 'admin' && !admin) return '/'
-  if (required === 'customer' && !customer) return '/'
-  if (required === true && !admin && !customer) return '/'
+
+  if (required === 'customer') {
+    if (!guest && !customer) return '/'
+    if (!allowGuest && guest && !customer) return '/'
+  }
+
+  if (required === true && !admin && !guest && !customer) return '/'
 
   // Redirections après login selon session
   if (to.path === '/' && admin) return '/orders'
-  if (to.path === '/' && customer && !admin) return '/products'
+  if (to.path === '/' && (guest || customer) && !admin) return '/products'
 
   return true
 })

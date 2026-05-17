@@ -1,4 +1,6 @@
 import { getRessourceData, getRessourceItemById } from './ressourcesService.js'
+import { getCombinationValues } from './stockService.js'
+
 const ID_COUNTRY = import.meta.env.VITE_ID_COUNTRY
 
 const categoryCache = new Map()
@@ -103,8 +105,23 @@ export async function getAllProducts() {
     }
 }
 
+export async function getProductByIdProductWithTax(id_product)
+{
+    if( !id_product ) throw new Error('id_product required')
+    const produit = []
+    try {
+        const product = await getRessourceItemById('products', id_product)
+        product.tax_rate = await getRateByTaxRulesGroupId(product.id_tax_rules_group)
+        produit.push(product)
+    }
+    catch ( error) {
+        throw error instanceof Error? error: new Error(String(error))
+    }
+    return produit
+}
+
 export async function getRateByTaxRulesGroupId(id_tax_rules_group) {
-    if (!id_tax_rules_group) throw new Error('id_tax_rules_group required')
+    if (!id_tax_rules_group) throw new Error('id_tax_rules_group required2')
 
     const cacheKey = `group:${id_tax_rules_group}`
     if (taxRateCache.has(cacheKey)) {
@@ -127,7 +144,7 @@ export async function getRateByTaxRulesGroupId(id_tax_rules_group) {
 }
 
 export async function getTaxRuleByTaxRulesGroupId(id_tax_rules_group, id_country = ID_COUNTRY) {
-    if (!id_tax_rules_group) throw new Error('id_tax_rules_group required')
+    if (!id_tax_rules_group) throw new Error('id_tax_rules_group required2')
 
     const cacheKey = `rule:${id_tax_rules_group}:${id_country}`
     if (taxRuleCache.has(cacheKey)) {
@@ -239,6 +256,13 @@ export async function getQuantityAvailableByProductIdAndAttribute(id_product)
         for (const stock of stocks) {
             const stockDetail = await getRessourceItemById('stock_availables', stock.id)
             if( stockDetail.id_product == id_product && stockDetail.id_product_attribute != '0') {
+                const combinationValues = await getCombinationValues(stockDetail.id_product_attribute)
+                const groupeName = combinationValues.map( item=> item.groupe ).join(', ')
+                const valueName = combinationValues.map( item=> item.valeur ).join(', ')
+                const price = Number(combinationValues[0]?.pricePlus ?? combinationValues[0]?.price ?? 0)
+                stockDetail.group = groupeName
+                stockDetail.value = valueName
+                stockDetail.price = price
                 quantity.push(stockDetail)
             }
         }

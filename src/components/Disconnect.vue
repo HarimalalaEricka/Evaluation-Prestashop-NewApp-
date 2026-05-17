@@ -6,19 +6,22 @@ function disconnect()
     try {
         const isAdmin = localStorage.getItem('userConnected')
         const isCustomer = localStorage.getItem('customerConnected')
-        
-        // Supprimer les deux sessions
-        localStorage.removeItem('userConnected')
-        localStorage.removeItem('customerConnected')
-        
-        // Rediriger vers la page appropriée
+        const isGuest = localStorage.getItem('guest')
+
         if (isAdmin) {
-            router.push('/')
-        } else if (isCustomer) {
-            router.push('/customers')
-        } else {
-            router.push('/')
+            localStorage.removeItem('userConnected')
         }
+
+        if (isCustomer) {
+            localStorage.removeItem('customerConnected')
+        }
+
+        if (isGuest) {
+            localStorage.removeItem('guest')
+            localStorage.removeItem('guestSession')
+        }
+
+        router.push({ name: 'customers' })
         
         alert('Déconnexion réussie.')
     } catch (error) {

@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { getAllCustomers } from '../services/customerService.js'
+import { getAllCustomers, createAnonymeCustomer } from '../services/customerService.js'
 
 const router = useRouter()
 const customers = ref([])
@@ -17,12 +17,23 @@ async function fetchCustomers() {
 
 function login(customerId)
 {
-    if (customerId == null) {
-        localStorage.setItem('customerConnected', JSON.stringify({ id: null, isAnonymous: true }))
-        router.push({ name: 'products' })
-    } else {
-        router.push({ name: 'loginCustomer', query: { customerId } })
+    router.push({ name: 'loginCustomer', query: { customerId } })
+}
+
+async function anonyme()
+{
+    const guest = await createAnonymeCustomer()
+    console.log('Anonyme guest created:', guest)
+    const guestSession = {
+        sessionType: 'guest',
+        guestId: Number(guest?.id ?? guest?.id_guest ?? 0),
+        customerId: Number(guest?.id_customer ?? 0),
+        ...guest,
     }
+    localStorage.removeItem('customerConnected')
+    localStorage.setItem('guest', JSON.stringify(guestSession))
+    console.log('[CustomerView] session active = guest', guestSession)
+    router.push({ name: 'products' })
 }
 
 onMounted(() => {
@@ -42,12 +53,12 @@ onMounted(() => {
 
             <tbody>
                 <tr>
-                    <td>Anonyme</td>  
-                    <td>Anonyme</td>  
-                    <td><button @click="login(null)">Naviguer anonymement</button></td>  
+                    <td>Anonyme</td>
+                    <td>-</td>
+                    <td><button @click="anonyme">Naviguer en tant qu'anonyme</button></td>
                 </tr>
                 <tr v-for="customer in customers" :key="customer.id">
-                    <td>{{ customer.lastname }}</td>  
+                    <td>{{ customer.firstname }} {{ customer.lastname}}</td>  
                     <td>{{ customer.email }}</td>  
                     <td><button @click="login(customer.id)">Se Connecter</button></td>  
                 </tr>

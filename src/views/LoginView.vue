@@ -1,44 +1,39 @@
 <script setup>
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { checkLogin } from '../services/loginService.js'
+import { ref } from "vue";
+import { useRouter } from "vue-router";
+import { checkLogin } from "../services/loginService.js";
 
-const router = useRouter()
-const userConnected = ref(null)
-const email = ref('nam@gmail.com')
-const password = ref('nam')
+const router = useRouter();
+const userConnected = ref(null);
+const email = ref("nam@gmail.com");
+const password = ref("nam");
+
 
 async function Connect() {
-    try {
-        const result = await checkLogin(email.value, password.value)
-        if (result) {
-            userConnected.value = result
+  try {
+    const result = await checkLogin(email.value, password.value);
+    if (result) {
+      userConnected.value = result;
 
-            // stockage dans session
-            localStorage.setItem(
-                'userConnected',
-                JSON.stringify(result)
-            )
-            //redirection
-            router.push('/orders') 
-        }
-
-    } catch (error) {
-        console.error('Erreur lors de la connexion :', error)
-        alert('Une erreur est survenue lors de la connexion.')
+      // stockage dans session
+      localStorage.setItem("userConnected", JSON.stringify(result));
+      //redirection
+      router.push("/orders");
     }
+  } catch (error) {
+    console.error("Erreur lors de la connexion :", error);
+    alert("Une erreur est survenue lors de la connexion.");
+  }
 }
 </script>
 <template>
-    <div>
-        <h1>Login</h1>
-        <label for="email">Email:</label>
-        <input type="email" id="email" v-model="email" required />
-        <label for="pwd">Password:</label>
-        <input type="password" id="pwd" v-model="password" required />
-        <button @click="Connect">Se connecter</button>
-    </div>
+  <div>
+    <h1>Login</h1>
+    <label for="email">Email:</label>
+    <input type="email" id="email" v-model="email" required />
+    <label for="pwd">Password:</label>
+    <input type="password" id="pwd" v-model="password" required />
+    <button @click="Connect">Se connecter</button>
+  </div>
 </template>
-<style lang="">
-
-</style>
+<style lang=""></style>

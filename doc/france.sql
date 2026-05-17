@@ -23,7 +23,7 @@ SELECT p.`id_product`, p.`reference`, p.`id_shop_default`, ps.`price` AS `price_
 SELECT value FROM configuration WHERE name = 'PS_OS_WS_PAYMENT';
 
 UPDATE configuration
-SET value = 2 -- force le paiement à la livraison
+SET value = 11 
 WHERE name = 'PS_OS_WS_PAYMENT'; 
 
 SELECT 

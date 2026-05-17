@@ -4,6 +4,24 @@ import { useRouter } from 'vue-router'
 import { getAllProducts } from '../services/productService.js'
 import RechercheProduct from '../components/RechercheProduct.vue'
 
+const idCustomer = getCustomerId()
+
+function getCustomerId() {
+    const guest = localStorage.getItem('guest')
+    const customerConnected = localStorage.getItem('customerConnected')
+
+    const sessionRaw = customerConnected || guest
+
+    if (!sessionRaw) return 0
+
+  try {
+        const session = JSON.parse(sessionRaw)
+        return Number(session?.id ?? session?.id_customer ?? 0)
+  } catch (error) {
+        console.error('Impossible de lire la session active:', error)
+    return 0
+  }
+}
 const produits = ref([])
 const router = useRouter()
 
@@ -33,6 +51,7 @@ console.log(produits.value)
 
 <template>
     <div>
+        <p>ID : {{idCustomer}}</p>
         <h1>Produits</h1>
         <RechercheProduct @update-products="updateProductsList" />
 

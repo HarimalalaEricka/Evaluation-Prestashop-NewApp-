@@ -239,3 +239,194 @@ export async function FilterSumByDate(date_debut, date_fin)
     })
     return filtered
 }
+
+export async function getOrdersByCustomerId(id_customer)
+{
+    if (!id_customer) {
+        throw new Error('id_customer is required')
+    }
+
+    const commandesDetails = []
+    try {
+        const commandes = await getRessourceData('orders')
+        for (const commande of commandes) {
+            const commandeDetails = await getRessourceItemById('orders', commande.id)
+            if( commandeDetails?.id_customer != id_customer) continue
+            const stateDetails = await getRessourceItemById('order_states', commandeDetails.current_state)
+            const stateName = stateDetails?.name
+            commandeDetails.current_state_label =
+                (typeof stateName === 'string' && stateName.trim()) ||
+                (Array.isArray(stateName) && stateName.find((item) => typeof item === 'string' && item.trim())) ||
+                (stateName?.language && String(stateName.language).trim()) ||
+                String(commandeDetails.current_state ?? '').trim()
+
+            const deliveryDetails = await getRessourceItemById('addresses', commandeDetails.id_address_delivery)
+            commandeDetails.city = deliveryDetails?.city
+
+            commandesDetails.push(commandeDetails)
+        }
+        return commandesDetails
+    } catch (error) {
+        throw error instanceof Error ? error : new Error(String(error))
+    }
+}
+
+export async function GetCartsGroupByDate()
+{
+    const carts = await getRessourceData('carts')
+    const groupedByDate = {}
+
+    try {
+        for (const cart of carts) {
+            if (!cart?.id) {
+                continue
+            }
+
+            const cartDetails = await getRessourceItemById('carts', cart.id)
+            const cartProducts = await getCartProductsByCartId(cart.id)
+
+            // Extraire la date de création du panier sans convertir en UTC (éviter décalage de fuseau)
+            const rawDate = cartDetails?.date_add
+            const dateKey = rawDate ? String(rawDate).split('T')[0].split(' ')[0] : null
+
+            if (!dateKey) {
+                continue
+            }
+
+            if (!groupedByDate[dateKey]) {
+                groupedByDate[dateKey] = {
+                    date: dateKey,
+                    total_carts: 0,
+                    total_amount: 0,
+                    type: 'panier'
+                }
+            }
+
+            // Compter le panier une seule fois (même s'il contient plusieurs produits)
+            groupedByDate[dateKey].total_carts += 1
+
+            // Calculer le montant total du panier (somme des lignes)
+            let cartTotal = 0
+            for (const product of cartProducts) {
+                const produit = await getRessourceItemById('products', product.id_product)
+                const price = Number(produit?.price ?? 0)
+                const qty = Number(product?.quantity ?? 0)
+                const ht = price * qty
+                const rate = Number(await getRateByTaxRulesGroupId(produit?.id_tax_rules_group) ?? 0)
+                const ttc = ht * (1 + (rate || 0) / 100)
+                cartTotal += Number.isFinite(ttc) ? ttc : 0
+            }
+
+            groupedByDate[dateKey].total_amount += cartTotal
+        }
+
+        // Retourner un tableau trié par date
+        return Object.values(groupedByDate).sort((a, b) => new Date(a.date) - new Date(b.date))
+    } catch (error) {
+        throw error instanceof Error ? error : new Error(String(error))
+    }
+}
+
+export async function SumOrdersGroupByDateWithStatus(orderStatus = 'all')
+{
+    const commandes = await getRessourceData('orders')
+    const groupedByDate = {}
+    
+    try {
+        for (const commande of commandes) {
+            if (!commande?.id) {
+                continue
+            }
+            
+            const commandeDetails = await getRessourceItemById('orders', commande.id)
+            const stateDetails = await getRessourceItemById('order_states', commandeDetails.current_state)
+            const stateName = stateDetails?.name
+            const stateLabel =
+                (typeof stateName === 'string' && stateName.trim()) ||
+                (Array.isArray(stateName) && stateName.find((item) => typeof item === 'string' && item.trim())) ||
+                (stateName?.language && String(stateName.language).trim()) ||
+                String(commandeDetails.current_state ?? '').trim()
+
+            // Filtrer par statut si spécifié
+            if (orderStatus !== 'all' && stateLabel !== orderStatus) {
+                continue
+            }
+
+            // Extraire la date de création de la commande
+            const dateKey = commandeDetails.date_add ? new Date(commandeDetails.date_add).toISOString().split('T')[0] : null
+            
+            if (!dateKey) {
+                continue
+            }
+            
+            if (!groupedByDate[dateKey]) {
+                groupedByDate[dateKey] = {
+                    date: dateKey,
+                    total_orders: 0,
+                    total_amount: 0,
+                    type: 'commande',
+                    status: orderStatus
+                }
+            }
+
+            groupedByDate[dateKey].total_orders += 1
+            groupedByDate[dateKey].total_amount += Number(commandeDetails.total_paid ?? 0)
+        }
+        
+        // Retourner un tableau trié par date
+        return Object.values(groupedByDate).sort((a, b) => new Date(a.date) - new Date(b.date))
+    } catch (error) {
+        throw error instanceof Error ? error : new Error(String(error))
+    }
+}
+
+export async function SumDashboardWithFilters(filterType = 'all')
+{
+    try {
+        let result = []
+
+        if (filterType === 'all' || filterType === 'orders') {
+            const orders = await SumOrdersGroupByDate()
+            result = result.concat(orders.map(o => ({...o, type: 'commande'})))
+        }
+
+        if (filterType === 'all' || filterType === 'carts') {
+            const carts = await GetCartsGroupByDate()
+            result = result.concat(carts.map(c => ({...c, type: 'panier'})))
+        }
+
+        if (filterType === 'paiement_effectue') {
+            const orders = await SumOrdersGroupByDateWithStatus('Paiement accepté')
+            result = result.concat(orders.map(o => ({...o, type: 'commande', status: 'Paiement accepté'})))
+        }
+
+        if (filterType === 'annule') {
+            const orders = await SumOrdersGroupByDateWithStatus('Annulé')
+            result = result.concat(orders.map(o => ({...o, type: 'commande', status: 'Annulé'})))
+        }
+
+        // Fusionner par date si nécessaire
+        const merged = {}
+        for (const item of result) {
+            if (!merged[item.date]) {
+                merged[item.date] = {
+                    date: item.date,
+                    total_orders: 0,
+                    total_carts: 0,
+                    total_amount: 0
+                }
+            }
+            if (item.type === 'commande') {
+                merged[item.date].total_orders += item.total_orders ?? 0
+                merged[item.date].total_amount += item.total_amount ?? 0
+            } else if (item.type === 'panier') {
+                merged[item.date].total_carts += item.total_carts ?? 0
+                merged[item.date].total_amount += item.total_amount ?? 0
+            }
+        }
+
+        return Object.values(merged).sort((a, b) => new Date(a.date) - new Date(b.date))
+    } catch (error) {
+        throw error instanceof Error ? error : new Error(String(error))
+    }
+}

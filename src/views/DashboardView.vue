@@ -1,55 +1,95 @@
 <script setup>
 import { ref, onMounted } from 'vue'
-import { SumOrdersGroupByDate, SumOrders, FilterSumByDate } from '../services/commandeService.js'
+import { SumDashboardWithFilters } from '../services/commandeService.js'
 const commandes = ref([])
+const commandesComplete = ref([])
 const sumOrder = ref({ total_orders: 0, total_amount: 0 })
 const dateDebut = ref('')
 const dateFin = ref('')
+const filterType = ref('all')
 
-async function fetchCommandesSummary() {
+const filterOptions = [
+    { value: 'all', label: 'Tout (Commandes + Paniers)' },
+    { value: 'orders', label: 'Commandes seulement' },
+    { value: 'carts', label: 'Paniers seulement' },
+    { value: 'paiement_effectue', label: 'Paiement effectué' },
+    { value: 'annule', label: 'Annulé' }
+]
+
+function updateSummary(data) {
+    sumOrder.value = data.reduce(
+        (acc, item) => {
+            acc.total_orders += Number(item.total_orders ?? 0)
+            acc.total_carts += Number(item.total_carts ?? 0)
+            acc.total_amount += Number(item.total_amount ?? 0)
+            return acc
+        },
+        { total_orders: 0, total_carts: 0, total_amount: 0 }
+    )
+}
+
+function isWithinSelectedDates(itemDate) {
+    const dateKey = String(itemDate ?? '')
+
+    if (dateDebut.value && dateKey < dateDebut.value) {
+        return false
+    }
+
+    if (dateFin.value && dateKey > dateFin.value) {
+        return false
+    }
+
+    return true
+}
+
+function applyCurrentFilters() {
+    const filteredCommandes = commandesComplete.value.filter((item) => isWithinSelectedDates(item.date))
+
+    commandes.value = filteredCommandes
+    updateSummary(filteredCommandes)
+}
+
+async function refreshDashboard() {
     try {
-        commandes.value = await SumOrdersGroupByDate()
-        sumOrder.value = await SumOrders()
-        console.log(sumOrder.value)
+        const data = await SumDashboardWithFilters(filterType.value)
+        commandesComplete.value = data
+        applyCurrentFilters()
+        console.log('Dashboard data:', data)
     } catch (error) {
         console.error('Erreur lors de la récupération des commandes :', error)
     }
 }
 
-async function applyDateFilter() {
-    try {
-        const filteredCommandes = dateDebut.value || dateFin.value
-            ? await FilterSumByDate(dateDebut.value, dateFin.value)
-            : await SumOrdersGroupByDate()
-
-        commandes.value = filteredCommandes
-        sumOrder.value = filteredCommandes.reduce(
-            (acc, commande) => {
-                acc.total_orders += Number(commande.total_orders ?? 0)
-                acc.total_amount += Number(commande.total_amount ?? 0)
-                return acc
-            },
-            { total_orders: 0, total_amount: 0 }
-        )
-    } catch (error) {
-        console.error('Erreur lors du filtrage des commandes :', error)
-    }
+function applyDateFilter() {
+    applyCurrentFilters()
 }
 
 function resetDateFilter() {
     dateDebut.value = ''
     dateFin.value = ''
-    fetchCommandesSummary()
+    applyCurrentFilters()
+}
+
+function onFilterChange() {
+    refreshDashboard()
 }
 
 onMounted(() => {
-    fetchCommandesSummary()
+    refreshDashboard()
 })
 </script>
 <template>
     <div>
         <h1>Dashboard</h1>
         <div style="margin-bottom: 16px; display: flex; gap: 12px; align-items: end; flex-wrap: wrap;">
+            <label>
+                Filtre type:
+                <select v-model="filterType" @change="onFilterChange">
+                    <option v-for="option in filterOptions" :key="option.value" :value="option.value">
+                        {{ option.label }}
+                    </option>
+                </select>
+            </label>
             <label>
                 Date début
                 <input v-model="dateDebut" type="date" />
@@ -66,15 +106,17 @@ onMounted(() => {
                 <tr>
                     <th>Date</th>
                     <th>Nombre de commandes</th>
+                    <th>Nombre de paniers</th>
                     <th>Montant</th>
                 </tr>
             </thead>
 
             <tbody>
-                <tr v-for="commande in commandes" :key="commande.date">
-                    <td>{{ commande.date }}</td>
-                    <td>{{ commande.total_orders }}</td>
-                    <td>{{ commande.total_amount.toFixed(2) }}</td>
+                <tr v-for="item in commandes" :key="item.date">
+                    <td>{{ item.date }}</td>
+                    <td>{{ item.total_orders ?? 0 }}</td>
+                    <td>{{ item.total_carts ?? 0 }}</td>
+                    <td>{{ (item.total_amount ?? 0).toFixed(2) }}</td>
                 </tr>
             </tbody>
         </table>
@@ -85,7 +127,15 @@ onMounted(() => {
                     <td>{{ sumOrder.total_orders }}</td>
                 </tr>
                 <tr>
-                    <th>Montant total des commandes:</th>
+                    <th>Nombre de paniers total:</th>
+                    <td>{{ sumOrder.total_carts ?? 0 }}</td>
+                </tr>
+                <tr>
+                    <th>Nombre commande totale</th>
+                    <td>{{ sumOrder.total_orders + sumOrder.total_carts }}</td>
+                </tr> 
+                <tr>
+                    <th>Montant total:</th>
                     <td>{{ sumOrder.total_amount.toFixed(2) }}</td>
                 </tr>
             </thead>
