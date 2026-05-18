@@ -5,6 +5,7 @@ import { getCartByCustomerId, getCartByGuestId, updateQuantityCart, deleteCartRo
 import { buildProductImageUrl, getRessourceItemById } from '../services/ressourcesService.js'
 import { getCombinationValues } from '../services/stockService.js'
 import { getRateByTaxRulesGroupId } from '../services/productService.js'
+import { usePagination } from '../composables/usePagination.js'
 
 const router = useRouter()
 const sessionInfo = getSessionInfo()
@@ -13,6 +14,12 @@ const rowDetails = ref([])
 const loading = ref(false)
 const error = ref('')
 const priceFormatter = new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
+const cartPagination = usePagination(rowDetails, 10)
+
+const visibleRows = computed(() => {
+  const items = Array.isArray(cartPagination.paginatedItems?.value) ? cartPagination.paginatedItems.value : []
+  return items.filter(Boolean)
+})
 
 function getSessionInfo() {
   const guestRaw = localStorage.getItem('guest')
@@ -87,6 +94,7 @@ async function fetchCart() {
       cart.value = await getCartByCustomerId(sessionInfo.id)
     }
     rowDetails.value = []
+    cartPagination.resetPage()
 
     if (cart.value && rows.value.length > 0) {
       rowDetails.value = await Promise.all(
@@ -150,6 +158,7 @@ async function fetchCart() {
           }
         })
       )
+      cartPagination.resetPage()
     }
 
     console.log('Cart data:', cart.value)
@@ -231,35 +240,40 @@ onMounted(fetchCart)
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(row, idx) in rowDetails" :key="idx">
+              <tr v-for="(row, idx) in visibleRows" :key="(row?.id_product ?? '') + '-' + (row?.id_product_attribute ?? idx)">
                 <td>
                   <img
-                    v-if="row.imageUrl"
-                    :src="row.imageUrl"
-                    :alt="row.productName"
+                    v-if="row?.imageUrl"
+                    :src="row?.imageUrl"
+                    :alt="row?.productName ?? ''"
                     width="56"
                     height="56"
                     style="object-fit: cover; border-radius: 8px; display: block;"
                   />
                 </td>
-                <td>{{ row.id_product }}</td>
-                <td>{{ row.productName }}</td>
-                <td>{{ row.reference }}</td>
-                <td>{{ row.groupLabel }}</td>
-                <td>{{ row.valueLabel }}</td>
+                <td>{{ row?.id_product ?? '' }}</td>
+                <td>{{ row?.productName ?? '' }}</td>
+                <td>{{ row?.reference ?? '' }}</td>
+                <td>{{ row?.groupLabel ?? '' }}</td>
+                <td>{{ row?.valueLabel ?? '' }}</td>
                 <!-- <td>{{ row.basePrice }}</td> -->
                 <!-- <td>{{ row.pricePlus }}</td> -->
                 <!-- <td>{{ row.taxRate }}</td> -->
-                <td>{{ row.rowPrice }}</td>
-                <td>{{ row.quantity }}</td>
+                <td>{{ row?.rowPrice ?? '' }}</td>
+                <td>{{ row?.quantity ?? 0 }}</td>
                 <td>
                   <input type="number" v-model.number="row.quantity" min="1" step="1" />
-                  <button @click="ModifierQuantite(row.id_product, row.quantity)">Modifier</button>
-                  <button @click="SupprimerLigne(row.id_product, row.id_product_attribute)">Supprimer</button>
+                  <button @click="ModifierQuantite(row?.id_product, row.quantity)">Modifier</button>
+                  <button @click="SupprimerLigne(row?.id_product, row?.id_product_attribute)">Supprimer</button>
                 </td>
               </tr>
             </tbody>
           </table>
+          <div v-if="cartPagination.totalPages > 1" style="margin-top: 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <button type="button" :disabled="cartPagination.currentPage === 1" @click="cartPagination.prevPage">Précédent</button>
+            <span>Page {{ cartPagination.currentPage }} / {{ cartPagination.totalPages }}</span>
+            <button type="button" :disabled="cartPagination.currentPage === cartPagination.totalPages" @click="cartPagination.nextPage">Suivant</button>
+          </div>
         </div>
       </div>
       <div v-else>

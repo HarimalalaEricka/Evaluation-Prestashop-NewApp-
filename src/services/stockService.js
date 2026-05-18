@@ -51,23 +51,35 @@ async function buildStockDetailsList(stockItems) {
 
         if (!stockDetail?.id_product || stockDetail.id_product === 0) continue
 
-        const product = await getRessourceItemById('products', stockDetail.id_product)
-        if (stockDetail.id_product_attribute == '0' && product.product_type == 'combinations') continue
-        stockDetail.product_name = getMultilingualText(product?.name) || `Produit #${stockDetail.id_product}`
-
-        if (stockDetail.id_product_attribute != '0') {
-            try {
-                const combinationValues = await getCombinationValues(stockDetail.id_product_attribute)
-                const labels = combinationValues.map(item => `${item.groupe}: ${item.valeur}`)
-
-                if (labels.length > 0) {
-                    stockDetail.product_name += ` (${labels.join(', ')})`
-                }
-            } catch (error) {
-                console.warn(`Impossible de charger les attributs pour la combinaison ${stockDetail.id_product_attribute}:`, error)
+        try {
+            const product = await getRessourceItemById('products', stockDetail.id_product)
+            
+            // Si le produit n'existe pas, ignorer cette ligne de stock
+            if (!product?.id) {
+                console.warn(`Produit #${stockDetail.id_product} introuvable pour le stock #${stock.id}`)
+                continue
             }
+            
+            if (stockDetail.id_product_attribute == '0' && product.product_type == 'combinations') continue
+            stockDetail.product_name = getMultilingualText(product?.name) || `Produit #${stockDetail.id_product}`
+
+            if (stockDetail.id_product_attribute != '0') {
+                try {
+                    const combinationValues = await getCombinationValues(stockDetail.id_product_attribute)
+                    const labels = combinationValues.map(item => `${item.groupe}: ${item.valeur}`)
+
+                    if (labels.length > 0) {
+                        stockDetail.product_name += ` (${labels.join(', ')})`
+                    }
+                } catch (error) {
+                    console.warn(`Impossible de charger les attributs pour la combinaison ${stockDetail.id_product_attribute}:`, error)
+                }
+            }
+            stockDetails.push(stockDetail)
+        } catch (error) {
+            console.warn(`Erreur lors du traitement du stock #${stock.id}:`, error)
+            continue
         }
-        stockDetails.push(stockDetail)
     }
 
     return stockDetails
@@ -227,7 +239,19 @@ export async function getSummaryStockByIdProduct(id_product)
             const id_stock = stockDetails.id_stock
             if (!id_stock) continue
             
-            const stockAvailable = await getRessourceItemById('stock_availables', id_stock)
+            let stockAvailable
+            try {
+                stockAvailable = await getRessourceItemById('stock_availables', id_stock)
+            } catch (error) {
+                console.warn(`Stock disponible #${id_stock} introuvable pour le mouvement de stock #${stock.id}`)
+                continue
+            }
+            
+            // Si le stock_available n'existe pas, ignorer
+            if (!stockAvailable?.id) {
+                console.warn(`Stock disponible #${id_stock} est vide/null pour le mouvement #${stock.id}`)
+                continue
+            }
             
             // Filtrer par produit
             if (stockAvailable.id_product != id_product) continue
@@ -321,7 +345,19 @@ export async function getSummaryStockByProductAndAttribute(id_product)
             const id_stock = stockDetails.id_stock
             if (!id_stock) continue
             
-            const stockAvailable = await getRessourceItemById('stock_availables', id_stock)
+            let stockAvailable
+            try {
+                stockAvailable = await getRessourceItemById('stock_availables', id_stock)
+            } catch (error) {
+                console.warn(`Stock disponible #${id_stock} introuvable pour le mouvement de stock #${stock.id}`)
+                continue
+            }
+            
+            // Si le stock_available n'existe pas, ignorer
+            if (!stockAvailable?.id) {
+                console.warn(`Stock disponible #${id_stock} est vide/null pour le mouvement #${stock.id}`)
+                continue
+            }
             
             // Filtrer par produit (garder toutes les déclinaisons)
             if (stockAvailable.id_product != id_product) continue

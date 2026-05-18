@@ -6,6 +6,7 @@ import { buildProductImageUrl, getRessourceItemById } from '../services/ressourc
 import { getCombinationValues } from '../services/stockService.js'
 import { getRateByTaxRulesGroupId } from '../services/productService.js'
 import { useRoute, useRouter } from 'vue-router'
+import { usePagination } from '../composables/usePagination.js'
 
 const router = useRouter()
 const route = useRoute()
@@ -21,6 +22,12 @@ const isConfirming = ref(false)
 const deliveryMethod = ref('Livraison gratuite')
 const paymentMethod = ref('Paiement comptant à la livraison')
 const priceFormatter = new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
+const orderRowPagination = usePagination(rowDetails, 10)
+
+const visibleOrderRows = computed(() => {
+  const items = Array.isArray(orderRowPagination.paginatedItems?.value) ? orderRowPagination.paginatedItems.value : []
+  return items.filter(Boolean)
+})
 
 function getSessionInfo() {
   const guestRaw = localStorage.getItem('guest')
@@ -158,6 +165,7 @@ async function fetchData() {
         }
       })
     )
+    orderRowPagination.resetPage()
   } catch (err) {
     error.value = err instanceof Error ? err.message : String(err)
   } finally {
@@ -265,26 +273,32 @@ onMounted(() => {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(row, idx) in rowDetails" :key="idx">
+          <tr v-for="(row, idx) in visibleOrderRows" :key="(row?.id_product ?? '') + '-' + idx">
             <td>
               <img
-                v-if="row.imageUrl"
-                :src="row.imageUrl"
-                :alt="row.productName"
+                v-if="row?.imageUrl"
+                :src="row?.imageUrl"
+                :alt="row?.productName ?? ''"
                 width="56"
                 height="56"
                 style="object-fit: cover; border-radius: 8px; display: block;"
               />
             </td>
-            <td>{{ row.productName }}</td>
-            <td>{{ row.reference }}</td>
-            <td>{{ row.groupLabel }}: {{ row.valueLabel }}</td>
-            <td>{{ priceFormatter.format((row.basePrice + row.pricePlus) * (1 + row.taxRate / 100)) }} €</td>
-            <td>{{ row.quantity }}</td>
-            <td>{{ priceFormatter.format(((row.basePrice + row.pricePlus) * (1 + row.taxRate / 100)) * row.quantity) }} €</td>
+            <td>{{ row?.productName ?? '' }}</td>
+            <td>{{ row?.reference ?? '' }}</td>
+            <td>{{ row?.groupLabel ?? '' }}: {{ row?.valueLabel ?? '' }}</td>
+            <td>{{ priceFormatter.format(((Number(row?.basePrice) || 0) + (Number(row?.pricePlus) || 0)) * (1 + (Number(row?.taxRate) || 0) / 100)) }} €</td>
+            <td>{{ row?.quantity ?? 0 }}</td>
+            <td>{{ priceFormatter.format((((Number(row?.basePrice) || 0) + (Number(row?.pricePlus) || 0)) * (1 + (Number(row?.taxRate) || 0) / 100)) * (Number(row?.quantity) || 0)) }} €</td>
           </tr>
         </tbody>
       </table>
+
+      <div v-if="orderRowPagination.totalPages > 1" style="margin-top: 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+        <button type="button" :disabled="orderRowPagination.currentPage === 1" @click="orderRowPagination.prevPage">Précédent</button>
+        <span>Page {{ orderRowPagination.currentPage }} / {{ orderRowPagination.totalPages }}</span>
+        <button type="button" :disabled="orderRowPagination.currentPage === orderRowPagination.totalPages" @click="orderRowPagination.nextPage">Suivant</button>
+      </div>
 
       <!-- Mode de livraison et paiement -->
       <h3>Mode de livraison</h3>

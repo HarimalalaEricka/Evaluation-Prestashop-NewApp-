@@ -1,7 +1,8 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getAllCustomers, createAnonymeCustomer } from '../services/customerService.js'
+import { usePagination } from '../composables/usePagination.js'
 
 const router = useRouter()
 const customers = ref([])
@@ -9,6 +10,8 @@ const loading = ref(false)
 const errorMessage = ref('')
 const filters = ref({ search: '', email: '' })
 const allCustomers = ref([])
+const customerPagination = usePagination(customers, 10)
+const visibleCustomers = computed(() => (customerPagination.paginatedItems.value ?? []).filter((customer) => customer && typeof customer === 'object'))
 
 async function fetchCustomers() {
     loading.value = true
@@ -17,6 +20,7 @@ async function fetchCustomers() {
     try {
         allCustomers.value = await getAllCustomers()
         customers.value = allCustomers.value
+        customerPagination.resetPage()
     } catch (error) {
         errorMessage.value = error instanceof Error ? error.message : String(error)
         console.error('Erreur lors de la récupération des clients :', error)
@@ -38,11 +42,14 @@ function applyFilters() {
 
         return matchesSearch && matchesEmail
     })
+
+    customerPagination.resetPage()
 }
 
 function resetFilters() {
     filters.value = { search: '', email: '' }
     customers.value = allCustomers.value
+    customerPagination.resetPage()
 }
 
 function login(customerId)
@@ -103,10 +110,10 @@ onMounted(() => {
                     <td>-</td>
                     <td><button @click="anonyme">Naviguer en tant qu'anonyme</button></td>
                 </tr>
-                <tr v-for="customer in customers" :key="customer.id">
-                    <td>{{ customer.firstname }} {{ customer.lastname}}</td>  
-                    <td>{{ customer.email }}</td>  
-                    <td><button @click="login(customer.id)">Se Connecter</button></td>  
+                <tr v-for="customer in visibleCustomers" :key="customer.id ?? customer.email ?? `${customer.firstname}-${customer.lastname}`">
+                    <td>{{ customer.firstname ?? '' }} {{ customer.lastname ?? '' }}</td>
+                    <td>{{ customer.email ?? '' }}</td>
+                    <td><button @click="login(customer.id)">Se Connecter</button></td>
                 </tr>
                 <tr v-if="customers.length === 0">
                     <td colspan="3" style="text-align: center;">Aucun client</td>
@@ -114,5 +121,11 @@ onMounted(() => {
             </tbody>
             
         </table>
+
+        <div v-if="customerPagination.totalPages > 1" style="margin-top: 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <button type="button" :disabled="customerPagination.currentPage === 1" @click="customerPagination.prevPage">Précédent</button>
+            <span>Page {{ customerPagination.currentPage }} / {{ customerPagination.totalPages }}</span>
+            <button type="button" :disabled="customerPagination.currentPage === customerPagination.totalPages" @click="customerPagination.nextPage">Suivant</button>
+        </div>
     </div>
 </template>

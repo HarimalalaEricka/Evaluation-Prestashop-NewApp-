@@ -1,6 +1,7 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, computed } from 'vue'
 import { changeOrderState, getOrderState, getOrdersByCustomerId } from '../services/commandeService.js'
+import { usePagination } from '../composables/usePagination.js'
 
 const commandes = ref([])
 const allCommandes = ref([])
@@ -8,6 +9,12 @@ const statesCommande = ref([])
 const loading = ref(false)
 const errorMessage = ref('')
 const filters = ref({ reference: '', city: '', stateId: '' })
+const orderPagination = usePagination(commandes, 10)
+
+const visibleCommandes = computed(() => {
+    const items = Array.isArray(orderPagination.paginatedItems?.value) ? orderPagination.paginatedItems.value : []
+    return items.filter(Boolean)
+})
 
 function getCustomerId() {
     const customerConnected = localStorage.getItem('customerConnected')
@@ -33,6 +40,7 @@ async function fetchCommandes() {
         allCommandes.value = await getOrdersByCustomerId(idCustomer)
         commandes.value = allCommandes.value
         statesCommande.value = await getOrderState()
+        orderPagination.resetPage()
         console.log(commandes.value)
     } catch (err) {
         errorMessage.value = err instanceof Error ? err.message : String(err)
@@ -59,11 +67,14 @@ function applyFilters() {
 
         return matchesReference && matchesCity && matchesState
     })
+
+    orderPagination.resetPage()
 }
 
 function resetFilters() {
     filters.value = { reference: '', city: '', stateId: '' }
     commandes.value = allCommandes.value
+    orderPagination.resetPage()
 }
 
 async function onStateChange(commande, event) {
@@ -130,27 +141,33 @@ onMounted(() => {
             </thead>
 
             <tbody>
-                <tr v-for="commande in commandes" :key="commande.id">
-                    <td>{{ commande.id }}</td>
-                    <td>{{ commande.reference }}</td>
-                    <td>{{ commande.city }}</td>
-                    <td>{{ commande.total_paid }}</td>
-                    <td>{{ commande.payment }}</td>
-                    <td>{{ commande.current_state_label }}</td>
-                    <td>{{ commande.date_add }}</td>
+                <tr v-for="(commande, index) in visibleCommandes" :key="commande?.id ?? ('commande-' + index)">
+                    <td>{{ commande?.id ?? '' }}</td>
+                    <td>{{ commande?.reference ?? '' }}</td>
+                    <td>{{ commande?.city ?? '' }}</td>
+                    <td>{{ commande?.total_paid ?? '' }}</td>
+                    <td>{{ commande?.payment ?? '' }}</td>
+                    <td>{{ commande?.current_state_label ?? '' }}</td>
+                    <td>{{ commande?.date_add ?? '' }}</td>
                     <td>
-                        <select :value="commande.current_state" @change="(e) => onStateChange(commande, e)">
+                        <select :value="commande?.current_state ?? ''" @change="(e) => onStateChange(commande, e)">
                             <option
                                 v-for="state in statesCommande"
-                                :key="state.id"
-                                :value="state.id"
+                                :key="state?.id ?? state"
+                                :value="state?.id ?? state"
                             >
-                                {{ state.name || state.id }}
+                                {{ state?.name ?? state?.id ?? state ?? '' }}
                             </option>
                         </select>
                     </td>
                 </tr>
             </tbody>
         </table>
+
+        <div v-if="orderPagination.totalPages > 1" style="margin-top: 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <button type="button" :disabled="orderPagination.currentPage === 1" @click="orderPagination.prevPage">Précédent</button>
+            <span>Page {{ orderPagination.currentPage }} / {{ orderPagination.totalPages }}</span>
+            <button type="button" :disabled="orderPagination.currentPage === orderPagination.totalPages" @click="orderPagination.nextPage">Suivant</button>
+        </div>
     </div>
 </template>

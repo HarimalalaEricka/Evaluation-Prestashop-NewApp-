@@ -1,8 +1,9 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { FilterProducts, getAllProducts } from '../services/productService.js'
 import RechercheProduct from '../components/RechercheProduct.vue'
+import { usePagination } from '../composables/usePagination.js'
 
 const idCustomer = getCustomerId()
 
@@ -27,6 +28,27 @@ const allProducts = ref([])
 const loading = ref(false)
 const errorMessage = ref('')
 const router = useRouter()
+const productPagination = usePagination(produits, 10)
+const visibleProducts = computed(() => (productPagination.paginatedItems.value ?? []).filter((product) => product && typeof product === 'object'))
+
+function getDisplayText(value) {
+    if (!value) return ''
+
+    if (typeof value === 'string') {
+        return value
+    }
+
+    if (Array.isArray(value)) {
+        const firstValue = value.find((item) => typeof item === 'string' && item.trim())
+        return firstValue ?? ''
+    }
+
+    if (typeof value === 'object') {
+        return value.language ?? value.value ?? value[1] ?? value[0] ?? ''
+    }
+
+    return String(value)
+}
 
 async function fetchProduits() {
     loading.value = true
@@ -35,6 +57,7 @@ async function fetchProduits() {
     try {
         allProducts.value = await getAllProducts()
         produits.value = allProducts.value
+        productPagination.resetPage()
     } catch (error) {
         errorMessage.value = error instanceof Error ? error.message : String(error)
         console.error('Erreur lors de la récupération des produits :', error)
@@ -54,6 +77,7 @@ async function applyFilters(filters) {
             filters.minPrice,
             filters.maxPrice,
         )
+        productPagination.resetPage()
     } catch (error) {
         errorMessage.value = error instanceof Error ? error.message : String(error)
         console.error('Erreur lors de l\'application des filtres :', error)
@@ -68,6 +92,7 @@ function goToProductDetails(productId) {
 
 function resetFilters() {
     produits.value = allProducts.value
+    productPagination.resetPage()
 }
 
 onMounted(() => {
@@ -101,12 +126,12 @@ console.log(produits.value)
             </thead>
 
             <tbody>
-                <tr v-for="product in produits" :key="product.id">
+                <tr v-for="product in visibleProducts" :key="product.id ?? product.reference ?? product.marque ?? 'product'">
                     <td>
                         <img
                             v-if="product.imageUrl"
                             :src="product.imageUrl"
-                            :alt="product.name?.language || product.name || 'Produit'"
+                            :alt="getDisplayText(product.name) || 'Produit'"
                             width="60"
                             height="60"
                             style="object-fit: cover; border-radius: 8px; display: block;"
@@ -114,9 +139,9 @@ console.log(produits.value)
                     </td>
                     <td>{{ product.id }}</td>
                     <td>{{ product.reference }}</td>
-                    <td>{{ product.name.language }}</td>
+                    <td>{{ getDisplayText(product.name) }}</td>
                     <td>{{ (product.price * (1 + product.tax_rate / 100)).toFixed(2) }}</td>
-                    <td>{{ product.categorie.language }}</td>
+                    <td>{{ getDisplayText(product.categorie) }}</td>
                     <td>{{ product.marque }}</td>
                     <td><button @click="goToProductDetails(product.id)">Détails</button></td>
                 </tr>
@@ -125,5 +150,11 @@ console.log(produits.value)
                 </tr>
             </tbody>
         </table>
+
+        <div v-if="productPagination.totalPages > 1" style="margin-top: 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <button type="button" :disabled="productPagination.currentPage === 1" @click="productPagination.prevPage">Précédent</button>
+            <span>Page {{ productPagination.currentPage }} / {{ productPagination.totalPages }}</span>
+            <button type="button" :disabled="productPagination.currentPage === productPagination.totalPages" @click="productPagination.nextPage">Suivant</button>
+        </div>
     </div>
 </template>

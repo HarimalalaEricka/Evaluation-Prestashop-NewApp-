@@ -1,7 +1,8 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getAllStocks, updateStock } from '../services/stockService.js'
+import { usePagination } from '../composables/usePagination.js'
 
 const router = useRouter()
 const stocks = ref([])
@@ -9,6 +10,12 @@ const allStocks = ref([])
 const loading = ref(false)
 const message = ref('')
 const filters = ref({ search: '', id_product: '' })
+const stockPagination = usePagination(stocks, 10)
+
+const visibleStocks = computed(() => {
+    const items = Array.isArray(stockPagination.paginatedItems?.value) ? stockPagination.paginatedItems.value : []
+    return items.filter(Boolean)
+})
 
 async function fetchStocks() {
     loading.value = true
@@ -18,6 +25,7 @@ async function fetchStocks() {
             newQuantity: 0,
         }))
         stocks.value = allStocks.value
+        stockPagination.resetPage()
         console.log(stocks.value)
     } catch (error) {
         console.error('Erreur lors de la récupération des stocks :', error)
@@ -40,11 +48,14 @@ function applyFilters() {
 
         return matchesSearch && matchesIdProduct
     })
+
+    stockPagination.resetPage()
 }
 
 function resetFilters() {
     filters.value = { search: '', id_product: '' }
     stocks.value = allStocks.value
+    stockPagination.resetPage()
 }
 
 async function handleUpdateStock(stock) {
@@ -104,14 +115,14 @@ onMounted(() => {
             </thead>
 
             <tbody>
-                <tr v-for="stock in stocks" :key="stock.id">
-                    <td>{{ stock.id_product }}</td>
-                    <td>{{ stock.product_name }}</td>
-                    <td>{{ stock.quantity }}</td>
+                <tr v-for="(stock, idx) in visibleStocks" :key="(stock?.id_product ?? '') + '-' + idx">
+                    <td>{{ stock?.id_product ?? '' }}</td>
+                    <td>{{ stock?.product_name ?? '' }}</td>
+                    <td>{{ stock?.quantity ?? 0 }}</td>
                     <td><input type="number" v-model.number="stock.newQuantity" :disabled="loading" /></td>
                     <td>
                         <button @click="handleUpdateStock(stock)" :disabled="loading">Update</button>
-                        <button @click="gotoEvolution(stock.id_product)" :disabled="loading">Évolution</button>
+                        <button @click="gotoEvolution(stock?.id_product)" :disabled="loading">Évolution</button>
                     </td>
                 </tr>
                 <tr v-if="stocks.length === 0">
@@ -120,5 +131,11 @@ onMounted(() => {
             </tbody>
             
         </table>
+
+        <div v-if="stockPagination.totalPages > 1" style="margin-top: 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <button type="button" :disabled="stockPagination.currentPage === 1" @click="stockPagination.prevPage">Précédent</button>
+            <span>Page {{ stockPagination.currentPage }} / {{ stockPagination.totalPages }}</span>
+            <button type="button" :disabled="stockPagination.currentPage === stockPagination.totalPages" @click="stockPagination.nextPage">Suivant</button>
+        </div>
     </div>
 </template>
