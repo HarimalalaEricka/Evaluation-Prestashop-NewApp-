@@ -1,31 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <prestashop xmlns:xlink="http://www.w3.org/1999/xlink">
-  <stock_mvt>
-    <id_product>
-      <![CDATA[20]]>
-    </id_product>
-    <id_product_attribute>
-      <![CDATA[40]]>
-    </id_product_attribute>
-    <id_employee>
-      <![CDATA[2]]>
-    </id_employee>
-    <id_stock>
-      <![CDATA[60]]>
-    </id_stock>
-    <id_stock_mvt_reason>
-      <![CDATA[11]]>
-    </id_stock_mvt_reason>
-    <physical_quantity>
-      <![CDATA[20]]>
-    </physical_quantity>
-    <sign>
-      <![CDATA[1]]>
-    </sign>
-    <price_te>
-      <![CDATA[4]]>
-    </price_te>
-    <date_add>
-      <![CDATA[2024-06-01 12:00:00]]>
-    </date_add>
-  </stock_mvt>
+<product>
+<active><![CDATA[1]]></active>
+<id_shop_default><![CDATA[1]]></id_shop_default>
+<state><![CDATA[1]]></state>
+<show_price><![CDATA[1]]></show_price>
+<available_for_order><![CDATA[1]]></available_for_order>
+<visibility><![CDATA[both]]></visibility>
+<on_sale><![CDATA[0]]></on_sale>
+<available_date><![CDATA[2025-01-12]]></available_date>
+<name>
+  <language id="1"><![CDATA[Tshirt]]></language>
+</name>
+<reference><![CDATA[T_01]]></reference>
+<id_tax_rules_group><![CDATA[11,65%]]></id_tax_rules_group>
+<wholesale_price><![CDATA[8.5]]></wholesale_price>
+<price><![CDATA[12.5]]></price>
+</product>
 </prestashop>

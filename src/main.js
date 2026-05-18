@@ -3,6 +3,9 @@ import { createPinia } from 'pinia'
 
 import App from './App.vue'
 import router from './router'
+import './assets/styles.css'
+
+import JSZip from 'jszip'
 
 const app = createApp(App)
 
@@ -21,5 +24,5 @@ window.addEventListener('storage', (event) => {
 		}
 	}
 })
-
+window.JSZip = JSZip
 app.mount('#app')

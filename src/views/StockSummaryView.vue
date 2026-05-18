@@ -17,7 +17,10 @@ onMounted(async () => {
 
 async function fetchStockSummary() {
     try {
-        stockSummary.value = await getSummaryStockByIdProduct(id_product)
+        stockSummary.value = dateDebut.value || dateFin.value
+            ? await FilterSummaryByDate(dateDebut.value, dateFin.value, id_product)
+            : await getSummaryStockByIdProduct(id_product)
+
         stockSummaryByAttribute.value = await getSummaryStockByProductAndAttribute(id_product)
         console.log('By product:', stockSummary.value)
         console.log('By attribute:', stockSummaryByAttribute.value)
@@ -27,20 +30,13 @@ async function fetchStockSummary() {
 }
 
 async function applyDateFilter() {
-    try {
-        const filteredStocks = dateDebut.value || dateFin.value
-            ? await FilterSummaryByDate(dateDebut.value, dateFin.value, id_product)
-            : await getSummaryStockByIdProduct(id_product)
-
-        stockSummary.value = filteredStocks
-    } catch (error) {
-        console.error('Erreur lors du filtrage des stocks par date :', error)
-    }
+    await fetchStockSummary()
 }
 
 function resetDateFilter() {
     dateDebut.value = ''
     dateFin.value = ''
+    fetchStockSummary()
 }
 
 </script>

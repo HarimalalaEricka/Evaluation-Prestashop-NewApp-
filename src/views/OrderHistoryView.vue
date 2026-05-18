@@ -3,9 +3,11 @@ import { onMounted, ref } from 'vue'
 import { changeOrderState, getOrderState, getOrdersByCustomerId } from '../services/commandeService.js'
 
 const commandes = ref([])
+const allCommandes = ref([])
 const statesCommande = ref([])
 const loading = ref(false)
 const errorMessage = ref('')
+const filters = ref({ reference: '', city: '', stateId: '' })
 
 function getCustomerId() {
     const customerConnected = localStorage.getItem('customerConnected')
@@ -28,7 +30,8 @@ async function fetchCommandes() {
     try {
         const idCustomer = getCustomerId()
         console.log('Fetching commandes for customer ID:', idCustomer)
-        commandes.value = await getOrdersByCustomerId(idCustomer)
+        allCommandes.value = await getOrdersByCustomerId(idCustomer)
+        commandes.value = allCommandes.value
         statesCommande.value = await getOrderState()
         console.log(commandes.value)
     } catch (err) {
@@ -37,6 +40,30 @@ async function fetchCommandes() {
     } finally {
         loading.value = false
     }
+}
+
+function applyFilters() {
+    const searchReference = String(filters.value.reference ?? '').trim().toLowerCase()
+    const searchCity = String(filters.value.city ?? '').trim().toLowerCase()
+    const searchState = String(filters.value.stateId ?? '').trim().toLowerCase()
+
+    commandes.value = allCommandes.value.filter((commande) => {
+        const reference = String(commande.reference ?? '').trim().toLowerCase()
+        const city = String(commande.city ?? '').trim().toLowerCase()
+        const stateLabel = String(commande.current_state_label ?? '').trim().toLowerCase()
+        const stateId = String(commande.current_state ?? '').trim().toLowerCase()
+
+        const matchesReference = searchReference ? reference.includes(searchReference) : true
+        const matchesCity = searchCity ? city.includes(searchCity) : true
+        const matchesState = searchState ? stateLabel.includes(searchState) || stateId.includes(searchState) : true
+
+        return matchesReference && matchesCity && matchesState
+    })
+}
+
+function resetFilters() {
+    filters.value = { reference: '', city: '', stateId: '' }
+    commandes.value = allCommandes.value
 }
 
 async function onStateChange(commande, event) {
@@ -62,6 +89,28 @@ onMounted(() => {
 <template>
     <div>
         <h1>Historique de mes commandes</h1>
+
+        <div style="margin-bottom: 16px; display: flex; gap: 12px; align-items: end; flex-wrap: wrap;">
+            <label>
+                Référence
+                <input v-model="filters.reference" type="text" />
+            </label>
+            <label>
+                Ville
+                <input v-model="filters.city" type="text" />
+            </label>
+            <label>
+                État
+                <select v-model="filters.stateId">
+                    <option value="">Tous</option>
+                    <option v-for="state in statesCommande" :key="state.id" :value="state.id">
+                        {{ state.name || state.id }}
+                    </option>
+                </select>
+            </label>
+            <button type="button" @click="applyFilters">Filtrer</button>
+            <button type="button" @click="resetFilters">Réinitialiser</button>
+        </div>
 
         <p v-if="loading">Chargement...</p>
         <p v-else-if="errorMessage">{{ errorMessage }}</p>

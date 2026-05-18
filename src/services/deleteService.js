@@ -98,3 +98,72 @@ export async function deleteAllResourceData(resourceName, options = {}) {
     return results
 }
 
+// supprimer le dernier item (par id décroissant) d'une ressource
+export async function deleteLastResource(resourceName) {
+    if (!resourceName) throw new Error('resourceName is required')
+
+    // Récupérer le dernier item via tri id_DESC, limit=1
+    let items = await getRessourceData(resourceName, { display: ['id'], page: 1, perPage: 1, sort: 'id_DESC' })
+    if (!items || items.length === 0) {
+        // try fetching full list as fallback
+        items = await getRessourceData(resourceName)
+        if (!items || items.length === 0) {
+            return { resource: resourceName, deleted: false, reason: 'no_items' }
+        }
+    }
+
+    // Try to obtain id from different possible fields
+    let id = items[0].id || ''
+    if (!id) {
+        // try extract id from url attribute if present (e.g. '/api/customers/123')
+        const url = String(items[0].url ?? items[0].href ?? '').trim()
+        const m = url.match(/\/(\d+)(?:\/?$)/)
+        if (m) id = m[1]
+    }
+
+    if (!id) {
+        // fallback: try the first element of a full fetch
+        try {
+            const all = await getRessourceData(resourceName)
+            if (Array.isArray(all) && all.length > 0) {
+                id = all[0].id || ''
+                if (!id) {
+                    const url2 = String(all[0].url ?? all[0].href ?? '').trim()
+                    const m2 = url2.match(/\/(\d+)(?:\/?$)/)
+                    if (m2) id = m2[1]
+                }
+            }
+        } catch (e) {
+            // ignore fallback errors
+        }
+    }
+
+    if (!id) return { resource: resourceName, deleted: false, reason: 'no_id' }
+
+    try {
+        await deleteResource(resourceName, id)
+        return { resource: resourceName, deleted: true, id }
+    } catch (err) {
+        return { resource: resourceName, deleted: false, id, reason: err instanceof Error ? err.message : String(err) }
+    }
+}
+
+// reset une liste de ressources en supprimant toutes les lignes de chacune
+export async function resetResources(resourceNames = []) {
+    if (!Array.isArray(resourceNames) || resourceNames.length === 0) {
+        throw new Error('resourceNames must be a non-empty array')
+    }
+
+    const results = []
+    for (const name of resourceNames) {
+        try {
+            const res = await deleteAllResourceData(name)
+            results.push(res)
+        } catch (err) {
+            results.push({ resource: name, deleted: false, reason: err instanceof Error ? err.message : String(err) })
+        }
+    }
+
+    return results
+}
+

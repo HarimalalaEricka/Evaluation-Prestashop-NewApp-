@@ -1,4 +1,4 @@
-import { getRessourceData, getAuthHeaders, getHttpErrorMessage, updateResourceData, insertResourceData } from './ressourcesService.js'
+import { getRessourceData, getAuthHeaders, getHttpErrorMessage, updateResourceData, insertResourceData, deleteCriticalResourcesData } from './ressourcesService.js'
 
 const BASE_URL = import.meta.env.VITE_API_PROXY_PATH
 const ID_COUNTRY = import.meta.env.VITE_ID_COUNTRY
@@ -28,7 +28,6 @@ function normalizeRateKey(value) {
         .replace(/,/g, '.')
         .replace(/\s+/g, '')
 
-    // Convertir en nombre pour supprimer les zéros inutiles
     const numValue = parseFloat(normalized)
     return isNaN(numValue) ? normalized : String(numValue)
 }
@@ -388,7 +387,6 @@ export async function buildOrderXmlFromSchema(values = {}, rows = [], totals = {
     const fields = await getOrderSchema()
     const now = new Date().toISOString().slice(0, 19).replace('T', ' ')
 
-    // Build simple field map using known names if present in schema
     const toCamel = (s = '') => String(s).replace(/_([a-z])/g, (_, g) => g.toUpperCase())
     const normalizeKeyVariants = (name) => {
         const camel = toCamel(name)
@@ -402,14 +400,12 @@ export async function buildOrderXmlFromSchema(values = {}, rows = [], totals = {
             if (Object.prototype.hasOwnProperty.call(values, k) && values[k] !== undefined && values[k] !== null) {
                 return String(values[k])
             }
-            // also try lowercase variant
             const lk = String(k).toLowerCase()
             if (Object.prototype.hasOwnProperty.call(values, lk) && values[lk] !== undefined && values[lk] !== null) {
                 return String(values[lk])
             }
         }
 
-        // totals map: try totals object keys as well
         for (const k of variants) {
             if (Object.prototype.hasOwnProperty.call(totals, k) && totals[k] !== undefined && totals[k] !== null) {
                 return String(totals[k])
@@ -425,7 +421,6 @@ export async function buildOrderXmlFromSchema(values = {}, rows = [], totals = {
 
     const body = []
 
-    // Common single fields
     const common = [
         'id_address_delivery','id_address_invoice','id_cart','id_currency','id_lang','id_customer',
         'id_carrier','current_state','module','valid','date_add','date_upd','id_shop_group','id_shop','secure_key','payment',
@@ -454,7 +449,6 @@ export async function buildOrderXmlFromSchema(values = {}, rows = [], totals = {
         }
     }
 
-    // Associations: order_rows
     const orderRowsXml = (rows || []).map((r) => {
         const pid = r.productId || r.product_id || ''
         const paid = r.productPrice ?? r.unit_price_tax_excl ?? '0'
@@ -465,14 +459,12 @@ export async function buildOrderXmlFromSchema(values = {}, rows = [], totals = {
 
     const associations = []
     if (fields.includes('associations')) {
-        // include order_rows if schema expects it
         associations.push('<associations>')
         associations.push('<order_rows>')
         associations.push(orderRowsXml)
         associations.push('</order_rows>')
         associations.push('</associations>')
     } else {
-        // still include for compatibility
         associations.push('<associations>')
         associations.push('<order_rows>')
         associations.push(orderRowsXml)
@@ -782,11 +774,9 @@ async function getStockAvailableEntry(productId, productAttributeId) {
     }
 
     try {
-        // Fetch ALL stock_availables (API filter doesn't work reliably)
         const xmlDoc = await fetchXmlDocument(`stock_availables?display=[id,id_product,id_product_attribute,quantity,id_shop,id_shop_group,out_of_stock,depends_on_stock]`)
         const allStockNodes = Array.from(xmlDoc.getElementsByTagName('stock_available'))
 
-        // Filter client-side for the matching product/attribute
         for (const stockNode of allStockNodes) {
             const nodeProductId = String(stockNode.getElementsByTagName('id_product')[0]?.textContent ?? '').trim()
             const nodeAttrId = String(stockNode.getElementsByTagName('id_product_attribute')[0]?.textContent ?? '0').trim() || '0'
@@ -824,23 +814,19 @@ export async function upsertStockAvailable({ productId, productAttributeId = '0'
     try {
         let stock = await getStockAvailableEntry(cleanedProductId, cleanedProductAttributeId)
 
-        // If stock entry not found, wait and retry (PrestaShop creates it automatically after product/combination creation)
         if (!stock?.id) {
             await new Promise((resolve) => setTimeout(resolve, 800))
             stock = await getStockAvailableEntry(cleanedProductId, cleanedProductAttributeId)
         }
 
         if (!stock?.id) {
-            // Stock entry still doesn't exist - log and skip
             console.warn(`[STOCK] Warning: stock_available entry not found for product ${cleanedProductId} attr ${cleanedProductAttributeId}. Will not be updated.`)
             return undefined
         }
 
-        // Use existing shop/shop_group values from DB to preserve them
         const finalIdShop = String(idShop ?? stock.idShop ?? DEFAULT_ID_SHOP).trim()
         const finalIdShopGroup = String(idShopGroup ?? stock.idShopGroup ?? DEFAULT_ID_SHOP_GROUP).trim()
 
-        // UPDATE existing - use buildStockAvailableXml to ensure all required fields
         const xml = buildStockAvailableXml({
             id: stock.id,
             productId: cleanedProductId,
@@ -908,7 +894,6 @@ async function getCombinationDetailsByProductId(productId) {
             const reference = String(detailNode.getElementsByTagName('reference')[0]?.textContent ?? '').trim()
             const price = String(detailNode.getElementsByTagName('price')[0]?.textContent ?? '').trim()
 
-            // attempt to fetch stock for this combination (may be null)
             let stockQty = 0
             try {
                 const stockEntry = await getStockAvailableEntry(productId, combinationId)
@@ -942,15 +927,13 @@ async function resolveCombinationIdByProductAndVariant(productId, variantName) {
 
     const normalizedInput = normalizeLookupKey(cleanedVariantName)
 
-    // Tokenize input: allow separators like / , + | - ;
     const tokens = cleanedVariantName
-        .split(/[\/,+|;\-]+/)
+        .split(/[/,+|;-]+/)
         .map((t) => normalizeLookupKey(t))
         .filter(Boolean)
 
     const combinations = await getCombinationDetailsByProductId(productId)
 
-    // Helper: choose best among candidates (prefer defaultOn, then stock>0)
     const chooseBest = (candidates) => {
         if (!Array.isArray(candidates) || candidates.length === 0) return null
         const byDefault = candidates.filter((c) => c.defaultOn)
@@ -964,14 +947,12 @@ async function resolveCombinationIdByProductAndVariant(productId, variantName) {
         return candidates[0]
     }
 
-    // 1) Try exact match on combination reference
     const refMatch = combinations.find((c) => {
         const cref = normalizeLookupKey(c.reference)
         return cref && (cref === normalizedInput || cref.includes(normalizedInput) || normalizedInput.includes(cref))
     })
     if (refMatch?.id) return String(refMatch.id).trim()
 
-    // 2) If tokens look like attribute IDs (all numeric), try matching by optionValueIds
     const allNumeric = tokens.length > 0 && tokens.every((t) => /^\d+$/.test(t))
     if (allNumeric) {
         const idTokens = tokens.map((t) => String(Number(t)))
@@ -980,7 +961,6 @@ async function resolveCombinationIdByProductAndVariant(productId, variantName) {
         if (chosen?.id) return String(chosen.id).trim()
     }
 
-    // 3) Try matching on attribute value labels (ps_attribute_lang.name)
     const labelsById = await getProductOptionValueLabelsById()
     const labelMatches = combinations.filter((combination) => {
         if (!Array.isArray(combination.optionValueIds) || combination.optionValueIds.length === 0) return false
@@ -989,24 +969,20 @@ async function resolveCombinationIdByProductAndVariant(productId, variantName) {
             .flatMap((optionValueId) => labelsById[String(optionValueId).trim()] || [])
             .map((label) => normalizeLookupKey(label))
 
-        // If multiple tokens provided, require all tokens to be matched
         if (tokens.length > 1) {
             return tokens.every((t) => combinationLabels.some((cl) => cl === t || cl.includes(t) || t.includes(cl)))
         }
 
-        // Single token: any label matches
         return combinationLabels.some((cl) => cl === normalizedInput || cl.includes(normalizedInput) || normalizedInput.includes(cl))
     })
 
     const chosenLabel = chooseBest(labelMatches)
     if (chosenLabel?.id) return String(chosenLabel.id).trim()
 
-    // 4) If only one combination exists for the product, return it as fallback
     if (combinations.length === 1 && combinations[0]?.id) {
         return String(combinations[0].id).trim()
     }
 
-    // Log diagnostics for debugging
     try {
         console.warn(`[ORDERS] Combination resolution failed for product ${productId} / input: "${cleanedVariantName}"`)
         const summary = combinations.map((c) => ({ id: c.id, reference: c.reference, optionValueIds: c.optionValueIds, defaultOn: !!c.defaultOn, stock: c.stock }))
@@ -1064,7 +1040,6 @@ export async function importCustomerOrders(rows, languageIds = [1]) {
 
     const results = { success: 0, errors: [], skippedRows: [] }
 
-    // Charger les données communes une seule fois
     const taxRulesGroupRateLookup = await getTaxRulesGroupRateLookup()
     const defaultCurrencyId = await getDefaultCurrencyId()
     const defaultCarrierId = await getDefaultCarrierId()
@@ -1075,20 +1050,18 @@ export async function importCustomerOrders(rows, languageIds = [1]) {
     const addressCache = {}
     const combinationCache = {}
 
-    // Traiter chaque ligne
     for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
         const row = rows[rowIndex]
         console.log(`\n[ORDERS] === Row ${rowIndex + 1}/${rows.length} ===`)
 
         try {
-            // Normaliser les clés de la ligne
             const rowLookup = Object.entries(row || {}).reduce((acc, [key, value]) => {
                 acc[normalizeLookupKey(key)] = value
                 return acc
             }, {})
 
-            // Extraire les champs
             const orderDate = normalizeDateString(rowLookup.date ?? rowLookup.date_add)
+            console.log('[ORDERS] date raw:', rowLookup.date, '→ normalized:', orderDate)
             const lastname = String(rowLookup.nom ?? rowLookup.lastname ?? '').trim()
             const firstname = String(rowLookup.prenom ?? rowLookup.firstname ?? lastname).trim()
             const email = String(rowLookup.email ?? '').trim()
@@ -1099,24 +1072,23 @@ export async function importCustomerOrders(rows, languageIds = [1]) {
             const stateName = String(rowLookup.etat ?? rowLookup.status ?? rowLookup.current_state ?? '').trim()
             const purchases = parsePurchaseList(rowLookup.achat ?? rowLookup.orders ?? rowLookup.order)
 
-            // Validations rapides
-            if (!email || !stateName || purchases.length === 0) {
-                const reason = !email ? 'Email manquant' : !stateName ? 'État manquant' : 'Aucun produit'
+            if (!email || purchases.length === 0) {
+                const reason = !email ? 'Email manquant' : 'Aucun produit'
                 console.warn(`[ORDERS] Skipped: ${reason}`)
                 results.skippedRows.push({ row, reason })
                 continue
             }
 
+            const normalizedStateName = normalizeLookupKey(stateName)
+            const isCartOnly = !stateName || normalizedStateName === 'danslepanier' || normalizedStateName === 'panier'
+
             console.log(`[ORDERS] Email: ${email}, ${purchases.length} item(s), state: ${stateName}`)
 
-            // === 1. ÉTAPE 1 : Créer ou retrouver le client ===
-            // === 1. ÉTAPE 1 : Créer ou retrouver le client ===
             let customerId, customerSecureKey
             {
                 let customer = customerCache[email] || (await getCustomerByEmail(email))
                 if (customer?.id) {
                     customerId = String(customer.id).trim()
-                    // ✔ utiliser le secure_key réel de PrestaShop
                     customerSecureKey = String(customer.secureKey ?? '').trim()
                     if (!customerSecureKey) {
                         throw new Error(`Secure key manquant pour customer ${customerId}`)
@@ -1127,7 +1099,6 @@ export async function importCustomerOrders(rows, languageIds = [1]) {
                     }
                     console.log(`[ORDERS] 1. Customer found: ${customerId}`)
                 } else {
-                    // ❌ NE PAS générer secureKey manuellement
                     const xml = buildCustomerXml({
                         lastname: lastname || firstname || email,
                         firstname: firstname || lastname || email,
@@ -1139,7 +1110,6 @@ export async function importCustomerOrders(rows, languageIds = [1]) {
                     const resp = await insertResourceData('customers', xml)
                     customerId = extractCreatedId(resp)
                     if (!customerId) throw new Error('Failed to create customer')
-                    // récupérer le customer créé avec son secure_key réel
                     const createdCustomer = await getCustomerByEmail(email)
                     customerSecureKey = String(createdCustomer?.secureKey ?? '').trim()
                     if (!customerSecureKey) {
@@ -1153,7 +1123,6 @@ export async function importCustomerOrders(rows, languageIds = [1]) {
                 }
             }
 
-            // === 2. ÉTAPE 2 : Créer ou retrouver l'adresse ===
             let addressId
             {
                 const addressKey = `${customerId}:${address1}`
@@ -1181,12 +1150,15 @@ export async function importCustomerOrders(rows, languageIds = [1]) {
                 }
             }
 
-            // === 3. ÉTAPE 3 : Résoudre l'état de commande ===
-            const currentStateId = await getOrderStateIdByName(stateName)
-            if (!currentStateId) throw new Error(`Order state not found: ${stateName}`)
-            console.log(`[ORDERS] 3. Order state: ${currentStateId}`)
+            let currentStateId = ''
+            if (!isCartOnly) {
+                currentStateId = await getOrderStateIdByName(stateName)
+                if (!currentStateId) throw new Error(`Order state not found: ${stateName}`)
+                console.log(`[ORDERS] 3. Order state: ${currentStateId}`)
+            } else {
+                console.log(`[ORDERS] 3. Cart-only mode — state resolution skipped`)
+            }
 
-            // === 4. ÉTAPE 4 : Traiter les produits ===
             const cartRows = []
             const orderRows = []
             let totalProducts = 0, totalProductsWt = 0
@@ -1199,12 +1171,10 @@ export async function importCustomerOrders(rows, languageIds = [1]) {
                 const productName = String(productEntry.name || productEntry.reference || item.reference).trim()
                 const basePrice = parseDecimalValue(productEntry.price) ?? 0
                 const productTaxRate = parseDecimalValue(taxRulesGroupRateLookup[productEntry.taxRulesGroupId]) ?? 0
-                // No per-item TTC price available for orders import; use base price as HT target
                 const targetHt = basePrice
 
                 let productAttributeId = '0', combinationPriceImpact = 0, lineLabel = productName
 
-                // Gérer les variantes
                 if (item.variant) {
                     const cacheKey = `${productId}:${normalizeLookupKey(item.variant)}`
                     let combinationEntry = combinationCache[cacheKey]
@@ -1223,13 +1193,15 @@ export async function importCustomerOrders(rows, languageIds = [1]) {
                     lineLabel = `${productName} - ${item.variant}`
                 }
 
-                const unitPriceExcl = basePrice + combinationPriceImpact
-                const unitPriceIncl = unitPriceExcl * (1 + productTaxRate / 100)
-                const lineTotalExcl = unitPriceExcl * item.quantity
-                const lineTotalIncl = unitPriceIncl * item.quantity
+                const unitPriceExcl = Math.round((basePrice + combinationPriceImpact) * 100) / 100
+                const unitPriceIncl = Math.round(unitPriceExcl * (1 + productTaxRate / 100) * 100) / 100
+                const lineTotalExcl = Math.round(unitPriceExcl * item.quantity * 100) / 100
+                const lineTotalIncl = Math.round(unitPriceIncl * item.quantity * 100) / 100
 
                 totalProducts += lineTotalExcl
                 totalProductsWt += lineTotalIncl
+                totalProducts = Math.round(totalProducts * 100) / 100
+                totalProductsWt = Math.round(totalProductsWt * 100) / 100
 
                 cartRows.push({ productId, productAttributeId, quantity: item.quantity })
                 orderRows.push({
@@ -1249,7 +1221,6 @@ export async function importCustomerOrders(rows, languageIds = [1]) {
             if (cartRows.length === 0) throw new Error('No items to order')
             console.log(`[ORDERS] 4. Items processed: ${cartRows.length}, total: ${totalProductsWt.toFixed(2)}`)
 
-            // === 5. ÉTAPE 5 : Créer le panier ===
             const secureKey = customerSecureKey
             const cartXml = buildCartXml({
                 idCustomer: customerId,
@@ -1268,7 +1239,25 @@ export async function importCustomerOrders(rows, languageIds = [1]) {
             }
             console.log(`[ORDERS] 5. Cart created: ${cartId}`)
 
-            // === 6. ÉTAPE 6 : Créer la commande ===
+            try {
+                await patchResourceData('carts', cartId, `<?xml version="1.0" encoding="UTF-8"?>
+            <prestashop xmlns:xlink="http://www.w3.org/1999/xlink">
+            <cart>
+            <id><![CDATA[${cartId}]]></id>
+            <date_add><![CDATA[${orderDate}]]></date_add>
+            </cart>
+            </prestashop>`)
+                console.log(`[ORDERS] 5b. Cart date_add patched: ${orderDate}`)
+            } catch (e) {
+                console.warn(`[ORDERS] 5b. Cart date_add patch skipped:`, e.message)
+            }
+
+            if (isCartOnly) {
+                results.success++
+                console.log(`[ORDERS] ✅ Row ${rowIndex + 1} SUCCESS - Cart only (no order): ${cartId}`)
+                continue
+            }
+
             const orderXml = await buildOrderXmlFromSchema(
                 {
                     idCustomer: customerId,
@@ -1299,8 +1288,21 @@ export async function importCustomerOrders(rows, languageIds = [1]) {
                 throw new Error('Failed to create order')
             }
             console.log(`[ORDERS] 6. Order created: ${orderId}`)
+
+            // patch date
+            try {
+                await patchResourceData('orders', orderId, `<?xml version="1.0" encoding="UTF-8"?>
+            <prestashop xmlns:xlink="http://www.w3.org/1999/xlink">
+            <order>
+            <id><![CDATA[${orderId}]]></id>
+            <date_add><![CDATA[${orderDate}]]></date_add>
+            </order>
+            </prestashop>`)
+                console.log(`[ORDERS]  date_add patched: ${orderDate}`)
+            } catch (e) {
+                console.warn(`[ORDERS]  date_add patch skipped:`, e.message)
+            }
             
-            // === 7. ÉTAPE 7 : Créer l'historique de statut ===
             try {
                 const histXml = buildOrderHistoryXml({
                     idOrder: orderId,
@@ -1313,26 +1315,28 @@ export async function importCustomerOrders(rows, languageIds = [1]) {
                 console.warn(`[ORDERS] 7. Order history skipped:`, e.message)
             }
 
-            // === 8. ÉTAPE 8 : Décrémenter le stock ===
-            for (const orderRow of orderRows) {
-                try {
-                    const stock = await getStockAvailableEntry(orderRow.productId, orderRow.productAttributeId)
-                    if (stock?.id) {
-                        const newQty = Math.max(0, (parseIntegerValue(stock.quantity) || 0) - orderRow.quantity)
-                        await upsertStockAvailable({
-                            productId: orderRow.productId,
-                            productAttributeId: orderRow.productAttributeId,
-                            quantity: newQty,
-                            idShop: stock.idShop,
-                            idShopGroup: stock.idShopGroup,
-                            outOfStock: stock.outOfStock,
-                            dependsOnStock: stock.dependsOnStock,
-                        })
-                    }
-                } catch (e) {
-                    console.warn(`[ORDERS] 8. Stock decrement skipped for product ${orderRow.productId}:`, e.message)
-                }
-            }
+            // for (const orderRow of orderRows) {
+            //     try {
+            //         const stock = await getStockAvailableEntry(orderRow.productId, orderRow.productAttributeId)
+            //         if (stock?.id) {
+            //             const quantityToDecrement = Number(orderRow.quantity ?? 0)
+            //             if (!Number.isFinite(quantityToDecrement) || quantityToDecrement <= 0) {
+            //                 console.warn(`[ORDERS] 8. Invalid stock decrement quantity for product ${orderRow.productId}:`, orderRow.quantity)
+            //                 continue
+            //             }
+
+            //             await updateStock({
+            //                 id: stock.id,
+            //                 id_product: orderRow.productId,
+            //                 id_product_attribute: orderRow.productAttributeId,
+            //                 id_shop: stock.idShop,
+            //                 newQuantity: -quantityToDecrement,
+            //             })
+            //         }
+            //     } catch (e) {
+            //         console.warn(`[ORDERS] 8. Stock decrement skipped for product ${orderRow.productId}:`, e.message)
+            //     }
+            // }
 
             results.success++
             console.log(`[ORDERS] ✅ Row ${rowIndex + 1} SUCCESS - Order ${orderId}`)
@@ -1461,16 +1465,13 @@ async function ensureProductOptionGroupIdByName(name, lookup = {}, cache = {}, l
 
     const normalizedName = normalizeLookupKey(cleanedName)
 
-    // 1. Cherche dans le cache local
     if (cache[normalizedName]) return cache[normalizedName]
 
-    // 2. Cherche dans le lookup préchargé
     if (lookup[normalizedName]) {
         cache[normalizedName] = lookup[normalizedName]
         return lookup[normalizedName]
     }
 
-    // 3. Crée le groupe si inexistant
     try {
         const createdResponse = await insertResourceData('product_options', buildProductOptionGroupXml(cleanedName, languageIds))
         const createdId = extractCreatedId(createdResponse)
@@ -1480,9 +1481,8 @@ async function ensureProductOptionGroupIdByName(name, lookup = {}, cache = {}, l
             lookup[normalizedName] = createdId
             return createdId
         }
-    } catch { /* ignore, on tente un refresh */ }
+    } catch { }
 
-    // 4. Refresh du lookup au cas où il aurait été créé entre temps
     try {
         const refreshedLookup = await getProductOptionGroupLookup()
         const refreshedId = refreshedLookup[normalizedName] || ''
@@ -1700,7 +1700,6 @@ export async function getTaxRuleGroupsByRateLookup() {
     const rateLookup = await getTaxRulesGroupRateLookup()
     const lookup = {}
     
-    // Inverser le lookup: {groupId: rate} → {rate: groupId}
     Object.entries(rateLookup).forEach(([groupId, rate]) => {
         const normalizedRate = normalizeRateKey(rate)
         if (normalizedRate && !lookup[normalizedRate]) {
@@ -1762,18 +1761,15 @@ export async function ensureTaxRuleGroupIdByRate(rateValue, lookup = {}, cache =
         return ''
     }
 
-    // Vérifier le cache d'abord
     if (cache[normalizedRate]) {
         return cache[normalizedRate]
     }
 
-    // Chercher dans le lookup (rate → groupId)
     if (lookup[normalizedRate]) {
         cache[normalizedRate] = lookup[normalizedRate]
         return lookup[normalizedRate]
     }
 
-    // Le groupe n'existe pas, créer un nouveau
     const taxRateLookup = await getTaxRateLookup()
     let taxId = taxRateLookup[normalizedRate] || ''
 
@@ -1933,7 +1929,6 @@ export async function prepareRowsForProductImport(
                 if (groupId) {
                     const normalizedRate = normalizeRateKey(csvValue)
                     taxRateToGroupIdLookup[normalizedRate] = groupId
-                    // keep groupId -> rate mapping updated
                     taxRulesGroupRateLookup[groupId] = normalizedRate
                 }
                 continue
@@ -1971,8 +1966,6 @@ export async function prepareRowsForProductImport(
         taxRateToGroupIdLookup,
     }
 }
-
-
 
 export async function patchResourceData(resourceName, resourceId, xmlData)
 {
@@ -2053,3 +2046,292 @@ export async function forceProductCombinationMode(productId, defaultCombinationI
     }
 }
 
+// ==================== FONCTIONS DE VALIDATION CSV ====================
+
+/**
+ * Vérifie les noms de colonnes (insensible à la casse)
+ * @param {string[]} actualColumns - Colonnes réelles du CSV
+ * @param {string[]} expectedColumns - Colonnes attendues
+ * @returns {Object} - Résultat de la validation
+ */
+export function validateColumns(actualColumns, expectedColumns) {
+    const actualNormalized = actualColumns.map(col => col.toLowerCase().trim())
+    const expectedNormalized = expectedColumns.map(col => col.toLowerCase().trim())
+    
+    const missingColumns = []
+    const foundMapping = {}
+    
+    expectedNormalized.forEach((expected, index) => {
+        const foundIndex = actualNormalized.indexOf(expected)
+        if (foundIndex === -1) {
+            missingColumns.push(expectedColumns[index])
+        } else {
+            foundMapping[expectedColumns[index]] = actualColumns[foundIndex]
+        }
+    })
+    
+    return {
+        isValid: missingColumns.length === 0,
+        missingColumns,
+        foundMapping,
+        actualColumns
+    }
+}
+
+/**
+ * Vérifie le format de date (DD/MM/YYYY ou YYYY-MM-DD)
+ * @param {string} value - Valeur à vérifier
+ * @returns {Object} - { isValid, normalizedValue, error }
+ */
+export function validateDateFormat(value) {
+    if (!value || String(value).trim() === '') {
+        return { isValid: true, normalizedValue: null, error: null }
+    }
+    
+    const cleaned = String(value).trim()
+    
+    // Format DD/MM/YYYY
+    const slashPattern = /^(\d{2})\/(\d{2})\/(\d{4})$/
+    const slashMatch = cleaned.match(slashPattern)
+    
+    if (slashMatch) {
+        const [, day, month, year] = slashMatch
+        const date = new Date(`${year}-${month}-${day}`)
+        if (!isNaN(date.getTime())) {
+            return { isValid: true, normalizedValue: `${year}-${month}-${day}`, error: null }
+        }
+    }
+    
+    // // Format YYYY-MM-DD
+    // const isoPattern = /^(\d{4})-(\d{2})-(\d{2})$/
+    // const isoMatch = cleaned.match(isoPattern)
+    
+    // if (isoMatch) {
+    //     const [, year, month, day] = isoMatch
+    //     const date = new Date(`${year}-${month}-${day}`)
+    //     if (!isNaN(date.getTime())) {
+    //         return { isValid: true, normalizedValue: cleaned, error: null }
+    //     }
+    // }
+    
+    // // Date valide mais format différent
+    // const parsed = new Date(cleaned)
+    // if (!isNaN(parsed.getTime())) {
+    //     const year = parsed.getFullYear()
+    //     const month = String(parsed.getMonth() + 1).padStart(2, '0')
+    //     const day = String(parsed.getDate()).padStart(2, '0')
+    //     return { isValid: true, normalizedValue: `${year}-${month}-${day}`, error: null }
+    // }
+    
+    return { isValid: false, normalizedValue: null, error: `Format de date invalide: "${cleaned}". Formats acceptés: DD/MM/YYYY` }
+}
+
+/**
+ * Vérifie que le montant n'est pas négatif
+ * @param {any} value - Valeur à vérifier
+ * @returns {Object} - { isValid, normalizedValue, error }
+ */
+export function validatePositiveAmount(value) {
+    if (value === null || value === undefined || String(value).trim() === '') {
+        return { isValid: true, normalizedValue: null, error: null }
+    }
+    
+    const cleaned = String(value).trim()
+        .replace(/\s+/g, '')
+        .replace(/,/g, '.')
+    
+    const num = parseFloat(cleaned)
+    
+    if (isNaN(num)) {
+        return { isValid: false, normalizedValue: null, error: `Montant invalide: "${cleaned}" (n'est pas un nombre)` }
+    }
+    
+    if (num < 0) {
+        return { isValid: false, normalizedValue: num, error: `Montant négatif: ${num}` }
+    }
+    
+    return { isValid: true, normalizedValue: num, error: null }
+}
+
+/**
+ * Valide une ligne complète du CSV
+ * @param {Object} row - Ligne du CSV
+ * @param {Object} columnMapping - Mapping des colonnes (ex: { email: 'Email', date: 'Date commande', montant: 'Montant' })
+ * @param {string[]} expectedDateColumns - Colonnes attendues au format date
+ * @param {string[]} expectedAmountColumns - Colonnes attendues avec montant positif
+ * @returns {Object} - Résultat de validation
+ */
+export function validateCsvRow(row, columnMapping, expectedDateColumns = [], expectedAmountColumns = []) {
+    const errors = []
+    const warnings = []
+    const normalizedRow = { ...row }
+    
+    // Vérification des colonnes selon le mapping (insensible à la casse)
+    for (const [expectedKey, actualColumnName] of Object.entries(columnMapping)) {
+        let foundValue = null
+        let foundColumn = null
+        
+        // Chercher la colonne dans la ligne (insensible à la casse)
+        for (const [colName, colValue] of Object.entries(row)) {
+            if (colName.toLowerCase().trim() === actualColumnName.toLowerCase().trim()) {
+                foundValue = colValue
+                foundColumn = colName
+                break
+            }
+        }
+        
+        if (foundValue !== null && foundValue !== undefined && String(foundValue).trim() !== '') {
+            normalizedRow[expectedKey] = foundValue
+        }
+    }
+    
+    // Validation des dates
+    for (const dateColumn of expectedDateColumns) {
+        const value = normalizedRow[dateColumn]
+        if (value !== null && value !== undefined && String(value).trim() !== '') {
+            const validation = validateDateFormat(value)
+            if (!validation.isValid) {
+                errors.push(`[${dateColumn}] ${validation.error}`)
+            } else if (validation.normalizedValue) {
+                normalizedRow[`${dateColumn}_normalized`] = validation.normalizedValue
+            }
+        }
+    }
+    
+    // Validation des montants positifs
+    for (const amountColumn of expectedAmountColumns) {
+        const value = normalizedRow[amountColumn]
+        if (value !== null && value !== undefined && String(value).trim() !== '') {
+            const validation = validatePositiveAmount(value)
+            if (!validation.isValid) {
+                errors.push(`[${amountColumn}] ${validation.error}`)
+            } else if (validation.normalizedValue !== null) {
+                normalizedRow[`${amountColumn}_normalized`] = validation.normalizedValue
+            }
+        }
+    }
+    
+    return {
+        isValid: errors.length === 0,
+        errors,
+        warnings,
+        normalizedRow,
+        originalRow: row
+    }
+}
+
+/**
+ * Valide un fichier CSV complet avant import
+ * @param {Array} csvData - Données du CSV (tableau d'objets)
+ * @param {Object} options - Options de validation
+ * @returns {Object} - Résultat global de validation
+ */
+export async function validateCsvImport(csvData, options = {}) {
+    const {
+        expectedColumns = ['email', 'nom', 'date', 'montant', 'reference'],
+        dateColumns = ['date', 'date_add', 'date_commande'],
+        amountColumns = ['montant', 'price', 'prix', 'total'],
+        columnMapping = {
+            email: 'email',
+            lastname: 'nom',
+            firstname: 'prenom',
+            date: 'date',
+            amount: 'montant',
+            reference: 'reference'
+        }
+    } = options
+    
+    if (!Array.isArray(csvData) || csvData.length === 0) {
+        return {
+            isValid: false,
+            totalRows: 0,
+            validRows: 0,
+            invalidRows: 0,
+            errors: ['Aucune donnée à importer'],
+            columnErrors: [],
+            rowDetails: []
+        }
+    }
+    
+    // 1. Récupérer les colonnes réelles
+    const actualColumns = Object.keys(csvData[0] || {})
+    
+    // 2. Valider les noms de colonnes (insensible à la casse)
+    const columnValidation = validateColumns(actualColumns, expectedColumns)
+    
+    const rowDetails = []
+    let validRows = 0
+    let invalidRows = 0
+    
+    // 3. Valider chaque ligne
+    for (let i = 0; i < csvData.length; i++) {
+        const row = csvData[i]
+        const validation = validateCsvRow(row, columnMapping, dateColumns, amountColumns)
+        
+        if (validation.isValid) {
+            validRows++
+        } else {
+            invalidRows++
+        }
+        
+        rowDetails.push({
+            rowIndex: i,
+            ...validation
+        })
+    }
+    
+    const allErrors = []
+    if (!columnValidation.isValid) {
+        allErrors.push(`Colonnes manquantes: ${columnValidation.missingColumns.join(', ')}`)
+        allErrors.push(`Colonnes trouvées: ${actualColumns.join(', ')}`)
+        allErrors.push(`Colonnes attendues: ${expectedColumns.join(', ')}`)
+    }
+    
+    const invalidRowErrors = rowDetails
+        .filter(r => !r.isValid)
+        .flatMap(r => r.errors.map(e => `Ligne ${r.rowIndex + 1}: ${e}`))
+    
+    allErrors.push(...invalidRowErrors)
+    
+    return {
+        isValid: columnValidation.isValid && invalidRows === 0,
+        totalRows: csvData.length,
+        validRows,
+        invalidRows,
+        errors: allErrors,
+        columnValidation,
+        rowDetails,
+        columnMapping: columnValidation.foundMapping
+    }
+}
+
+/**
+ * Nettoie et prépare les données CSV pour l'import
+ * @param {Array} csvData - Données CSV brutes
+ * @param {Object} validationResult - Résultat de validation
+ * @returns {Array} - Données nettoyées et prêtes pour l'import
+ */
+export function prepareImportData(csvData, validationResult) {
+    if (!validationResult?.isValid) {
+        throw new Error('Les données contiennent des erreurs. Veuillez corriger avant import.')
+    }
+    
+    return csvData.map((row, index) => {
+        const rowDetail = validationResult.rowDetails[index]
+        const cleanedRow = { ...row }
+        
+        // Remplacer les valeurs originales par les valeurs normalisées
+        if (rowDetail?.normalizedRow) {
+            Object.entries(rowDetail.normalizedRow).forEach(([key, value]) => {
+                if (key.endsWith('_normalized')) {
+                    const originalKey = key.replace('_normalized', '')
+                    cleanedRow[originalKey] = value
+                } else {
+                    cleanedRow[key] = value
+                }
+            })
+        }
+        
+        return cleanedRow
+    })
+}

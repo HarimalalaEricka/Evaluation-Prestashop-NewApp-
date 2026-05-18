@@ -5,14 +5,44 @@ import { getAllCustomers, createAnonymeCustomer } from '../services/customerServ
 
 const router = useRouter()
 const customers = ref([])
+const loading = ref(false)
+const errorMessage = ref('')
+const filters = ref({ search: '', email: '' })
+const allCustomers = ref([])
 
 async function fetchCustomers() {
+    loading.value = true
+    errorMessage.value = ''
+
     try {
-        customers.value = await getAllCustomers()
-        console.log(customers.value)
+        allCustomers.value = await getAllCustomers()
+        customers.value = allCustomers.value
     } catch (error) {
+        errorMessage.value = error instanceof Error ? error.message : String(error)
         console.error('Erreur lors de la récupération des clients :', error)
+    } finally {
+        loading.value = false
     }
+}
+
+function applyFilters() {
+    const searchText = String(filters.value.search ?? '').trim().toLowerCase()
+    const searchEmail = String(filters.value.email ?? '').trim().toLowerCase()
+
+    customers.value = allCustomers.value.filter((customer) => {
+        const fullName = `${customer.firstname ?? ''} ${customer.lastname ?? ''}`.trim().toLowerCase()
+        const email = String(customer.email ?? '').trim().toLowerCase()
+
+        const matchesSearch = searchText ? fullName.includes(searchText) || email.includes(searchText) : true
+        const matchesEmail = searchEmail ? email.includes(searchEmail) : true
+
+        return matchesSearch && matchesEmail
+    })
+}
+
+function resetFilters() {
+    filters.value = { search: '', email: '' }
+    customers.value = allCustomers.value
 }
 
 function login(customerId)
@@ -42,7 +72,23 @@ onMounted(() => {
 </script>
 <template>
     <div>
-        <table border="1">
+        <div style="margin-bottom: 16px; display: flex; gap: 12px; align-items: end; flex-wrap: wrap;">
+            <label>
+                Nom ou e-mail
+                <input v-model="filters.search" type="text" />
+            </label>
+            <label>
+                E-mail
+                <input v-model="filters.email" type="text" />
+            </label>
+            <button type="button" @click="applyFilters">Filtrer</button>
+            <button type="button" @click="resetFilters">Réinitialiser</button>
+        </div>
+
+        <p v-if="loading">Chargement...</p>
+        <p v-else-if="errorMessage">{{ errorMessage }}</p>
+
+        <table v-else border="1">
             <thead>
                 <tr>
                     <th>Nom</th>
@@ -61,6 +107,9 @@ onMounted(() => {
                     <td>{{ customer.firstname }} {{ customer.lastname}}</td>  
                     <td>{{ customer.email }}</td>  
                     <td><button @click="login(customer.id)">Se Connecter</button></td>  
+                </tr>
+                <tr v-if="customers.length === 0">
+                    <td colspan="3" style="text-align: center;">Aucun client</td>
                 </tr>
             </tbody>
             

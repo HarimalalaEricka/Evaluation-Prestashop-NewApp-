@@ -18,7 +18,7 @@ async function Connect() {
       // stockage dans session
       localStorage.setItem("userConnected", JSON.stringify(result));
       //redirection
-      router.push("/orders");
+      router.push("/");
     }
   } catch (error) {
     console.error("Erreur lors de la connexion :", error);

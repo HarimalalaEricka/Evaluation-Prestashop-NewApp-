@@ -1,13 +1,14 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import { getCartByCustomerId, getCartByGuestId } from '../services/CartService.js'
+import { getCartByGuestId } from '../services/CartService.js'
 import { insertOrder } from '../services/commandeService.js'
-import { getRessourceItemById } from '../services/ressourcesService.js'
+import { buildProductImageUrl, getRessourceItemById } from '../services/ressourcesService.js'
 import { getCombinationValues } from '../services/stockService.js'
 import { getRateByTaxRulesGroupId } from '../services/productService.js'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 const router = useRouter()
+const route = useRoute()
 const sessionInfo = getSessionInfo()
 
 const customer = ref(null)
@@ -77,11 +78,17 @@ async function fetchData() {
   error.value = ''
 
   try {
-    // Récupérer le panier
-    if (sessionInfo.type === 'guest') {
+    const routeCartId = String(route.value?.query?.cartId ?? '').trim()
+    const storedCartId = String(localStorage.getItem('customerCart') ?? '').trim()
+    const selectedCartId = routeCartId || storedCartId
+
+    if (selectedCartId) {
+      cart.value = await getRessourceItemById('carts', selectedCartId)
+    } else if (sessionInfo.type === 'guest') {
       cart.value = await getCartByGuestId(sessionInfo.id)
     } else {
-      cart.value = await getCartByCustomerId(sessionInfo.id)
+      error.value = 'Aucun panier sélectionné pour la validation'
+      return
     }
 
     if (!cart.value) {
@@ -112,6 +119,7 @@ async function fetchData() {
         let groupLabel = '-'
         let valueLabel = '-'
         let pricePlus = 0
+        let imageUrl = ''
 
         try {
           const product = await getRessourceItemById('products', idProduct)
@@ -119,6 +127,7 @@ async function fetchData() {
           reference = product?.reference || '-'
           basePrice = Number(product?.price ?? 0)
           taxRate = Number(await getRateByTaxRulesGroupId(product?.id_tax_rules_group))
+          imageUrl = buildProductImageUrl(product)
         } catch (productError) {
           console.warn('Impossible de charger le produit:', { idProduct, productError })
         }
@@ -145,6 +154,7 @@ async function fetchData() {
           basePrice,
           pricePlus,
           taxRate,
+          imageUrl,
         }
       })
     )
@@ -170,6 +180,7 @@ async function confirmerCommande() {
 
   try {
     await insertOrder(cart.value.id)
+    localStorage.removeItem('customerCart')
     alert('Commande créée avec succès !')
     // Redirection vers l'historique des commandes
     router.push('/orders')
@@ -240,6 +251,7 @@ onMounted(() => {
       <table border="1" style="margin-bottom: 20px;">
         <thead>
           <tr>
+            <th>Image</th>
             <th>Produit</th>
             <th>Référence</th>
             <th>Attribut</th>
@@ -250,6 +262,16 @@ onMounted(() => {
         </thead>
         <tbody>
           <tr v-for="(row, idx) in rowDetails" :key="idx">
+            <td>
+              <img
+                v-if="row.imageUrl"
+                :src="row.imageUrl"
+                :alt="row.productName"
+                width="56"
+                height="56"
+                style="object-fit: cover; border-radius: 8px; display: block;"
+              />
+            </td>
             <td>{{ row.productName }}</td>
             <td>{{ row.reference }}</td>
             <td>{{ row.groupLabel }}: {{ row.valueLabel }}</td>

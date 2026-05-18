@@ -1,32 +1,31 @@
 <script setup>
 import { ref } from 'vue'
-import { FilterProducts, getAllProducts } from '../services/productService.js'
 
-const emit = defineEmits(['update-products'])
+const emit = defineEmits(['apply-filters', 'reset-filters'])
 
 const nomProduit = ref('')
+const referenceProduit = ref('')
 const categorieProduit = ref('')
 const minPrix = ref(null)
 const maxPrix = ref(null)
 
-async function applyFilters()
-{
-    try {
-        const filteredProducts = await FilterProducts(nomProduit.value, categorieProduit.value, minPrix.value, maxPrix.value)
-        emit('update-products', filteredProducts)
-    } catch (error) {
-        console.error('Erreur lors de l\'application des filtres :', error)
-        alert('Une erreur est survenue lors de l\'application des filtres.')
-    }
+function applyFilters() {
+    emit('apply-filters', {
+        name: nomProduit.value,
+        reference: referenceProduit.value,
+        categorie: categorieProduit.value,
+        minPrice: minPrix.value,
+        maxPrice: maxPrix.value,
+    })
 }
-async function resetFilters()
-{
+
+function resetFilters() {
     nomProduit.value = ''
+    referenceProduit.value = ''
     categorieProduit.value = ''
     minPrix.value = null
     maxPrix.value = null
-    const allProducts = await getAllProducts()
-    emit('update-products', allProducts)
+    emit('reset-filters')
 }
 </script>
 <template>
@@ -34,6 +33,10 @@ async function resetFilters()
             <label>
                 Nom du produit:
                 <input type="text" v-model="nomProduit" />
+            </label>
+            <label>
+                Référence:
+                <input type="text" v-model="referenceProduit" />
             </label>
             <label>
                 Catégorie:

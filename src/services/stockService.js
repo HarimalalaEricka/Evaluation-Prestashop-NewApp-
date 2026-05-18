@@ -37,9 +37,93 @@ function normalizeWebserviceItems(value) {
         .filter((item) => item !== null && item !== undefined && item !== '')
 }
 
+function normalizeText(value) {
+    return String(value ?? '').trim().toLowerCase()
+}
+
+async function buildStockDetailsList(stockItems) {
+    const stockDetails = []
+
+    for (const stock of stockItems) {
+        if (!stock?.id) continue
+
+        const stockDetail = await getRessourceItemById('stock_availables', stock.id)
+
+        if (!stockDetail?.id_product || stockDetail.id_product === 0) continue
+
+        const product = await getRessourceItemById('products', stockDetail.id_product)
+        if (stockDetail.id_product_attribute == '0' && product.product_type == 'combinations') continue
+        stockDetail.product_name = getMultilingualText(product?.name) || `Produit #${stockDetail.id_product}`
+
+        if (stockDetail.id_product_attribute != '0') {
+            try {
+                const combinationValues = await getCombinationValues(stockDetail.id_product_attribute)
+                const labels = combinationValues.map(item => `${item.groupe}: ${item.valeur}`)
+
+                if (labels.length > 0) {
+                    stockDetail.product_name += ` (${labels.join(', ')})`
+                }
+            } catch (error) {
+                console.warn(`Impossible de charger les attributs pour la combinaison ${stockDetail.id_product_attribute}:`, error)
+            }
+        }
+        stockDetails.push(stockDetail)
+    }
+
+    return stockDetails
+}
+
+function applyStockFilters(stocks, filters = {}) {
+    const searchText = normalizeText(filters.search)
+    const searchProductId = normalizeText(filters.id_product)
+
+    return stocks.filter((stock) => {
+        const productName = normalizeText(stock?.product_name)
+        const idProduct = normalizeText(stock?.id_product)
+
+        const matchesSearch = searchText ? productName.includes(searchText) || idProduct.includes(searchText) : true
+        const matchesProductId = searchProductId ? idProduct.includes(searchProductId) : true
+
+        return matchesSearch && matchesProductId
+    })
+}
+
+export async function getStocksPage({ page = 1, perPage = 10, filters = {} } = {}) {
+    const rawFilters = {}
+
+    if (filters.id_product) {
+        rawFilters.id_product = String(filters.id_product)
+    }
+
+    const stocks = await getRessourceData('stock_availables', {
+        display: ['id'],
+        page,
+        perPage: perPage + 1,
+        filters: rawFilters,
+        sort: 'id_DESC',
+    })
+
+    const hasMore = stocks.length > perPage
+    const visibleStocks = stocks.slice(0, perPage)
+    const stockDetails = await buildStockDetailsList(visibleStocks)
+
+    return {
+        items: applyStockFilters(stockDetails, filters),
+        hasMore,
+    }
+}
+
+function paginateRecords(records, page = 1, perPage = 10) {
+    const startIndex = Math.max(0, (page - 1) * perPage)
+    const items = records.slice(startIndex, startIndex + perPage)
+    return {
+        items,
+        hasMore: records.length > startIndex + perPage,
+    }
+}
+
 export async function getAllStocks()
 {
-    const stockDetails = []
     try
     {
         const stocks = await getRessourceData('stock_availables')
@@ -48,36 +132,10 @@ export async function getAllStocks()
             return []
         }
 
-        for( const stock of stocks )
-        {
-            if(!stock?.id) continue
-            
-            const stockDetail = await getRessourceItemById('stock_availables', stock.id)
-            
-            if(!stockDetail?.id_product || stockDetail.id_product === 0) continue
-
-            const product = await getRessourceItemById('products', stockDetail.id_product)
-            if( stockDetail.id_product_attribute == '0' && product.product_type == 'combinations' ) continue
-            stockDetail.product_name = getMultilingualText(product?.name) || `Produit #${stockDetail.id_product}`
-
-            if (stockDetail.id_product_attribute != '0') {
-                try {
-                    const combinationValues = await getCombinationValues( stockDetail.id_product_attribute)
-                    const labels = combinationValues.map(item => `${item.groupe}: ${item.valeur}`)
-
-                    if (labels.length > 0) {
-                        stockDetail.product_name += ` (${labels.join(', ')})`
-                    }
-                } catch (error) {
-                    console.warn(`Impossible de charger les attributs pour la combinaison ${stockDetail.id_product_attribute}:`, error)
-                }
-            }
-            stockDetails.push(stockDetail)
-        }
+        return await buildStockDetailsList(stocks)
     } catch (error) {
         throw error instanceof Error ? error : new Error(String(error))
     }
-    return stockDetails
 }
 
 export async function getCombinationValues(id_product_attribute)
@@ -160,7 +218,6 @@ export async function getSummaryStockByIdProduct(id_product)
     const groupedByDate = {}
     
     try {
-        let matchedCount = 0
         for (const stock of stocks) {
             if (!stock?.id) continue
             
@@ -373,6 +430,16 @@ export async function getSummaryStockByProductAndAttribute(id_product)
     } catch (error) {
         throw error instanceof Error ? error : new Error(String(error))
     }
+}
+
+export async function getSummaryStockByIdProductPage(id_product, { page = 1, perPage = 10 } = {}) {
+    const records = await getSummaryStockByIdProduct(id_product)
+    return paginateRecords(records, page, perPage)
+}
+
+export async function getSummaryStockByProductAndAttributePage(id_product, { page = 1, perPage = 10 } = {}) {
+    const records = await getSummaryStockByProductAndAttribute(id_product)
+    return paginateRecords(records, page, perPage)
 }
 
 

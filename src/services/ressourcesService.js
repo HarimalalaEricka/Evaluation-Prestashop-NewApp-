@@ -1,4 +1,7 @@
 const BASE_URL = import.meta.env.VITE_API_PROXY_PATH
+const SHOP_BASE_URL = String(import.meta.env.VITE_API_URL_BACKEND ?? '')
+    .replace(/\/api\/?$/, '')
+    .replace(/\/$/, '')
 const API_KEY = import.meta.env.VITE_API_KEY
 const REQUEST_TIMEOUT_MS = 10000
 
@@ -20,6 +23,83 @@ function getResourceUrl(resourceElement) {
         resourceElement.getAttribute('href') ||
         ''
     )
+}
+
+function extractFirstScalar(value) {
+    if (value == null) {
+        return ''
+    }
+
+    if (Array.isArray(value)) {
+        for (const item of value) {
+            const extracted = extractFirstScalar(item)
+            if (extracted) {
+                return extracted
+            }
+        }
+
+        return ''
+    }
+
+    if (typeof value === 'object') {
+        const preferredKeys = ['id_default_image', 'id_image', 'id', 'image', 'value']
+
+        for (const key of preferredKeys) {
+            if (value[key] != null) {
+                const extracted = extractFirstScalar(value[key])
+                if (extracted) {
+                    return extracted
+                }
+            }
+        }
+
+        for (const nestedValue of Object.values(value)) {
+            const extracted = extractFirstScalar(nestedValue)
+            if (extracted) {
+                return extracted
+            }
+        }
+
+        return ''
+    }
+
+    return String(value).trim()
+}
+
+function buildImagePathFromId(imageId) {
+    const cleanedImageId = String(imageId ?? '').trim()
+
+    if (!cleanedImageId) {
+        return ''
+    }
+
+    return `${cleanedImageId.split('').join('/')}/${cleanedImageId}`
+}
+
+export function buildProductImageUrl(product, size = 'home_default') {
+    const cleanedProductId = String(product?.id ?? '').trim()
+    if (!cleanedProductId || !SHOP_BASE_URL) {
+        return ''
+    }
+
+    const imageId = extractFirstScalar(
+        product?.id_default_image
+        ?? product?.id_image
+        ?? product?.associations?.images?.image
+        ?? product?.associations?.image
+        ?? product?.image
+    )
+
+    if (!imageId) {
+        return ''
+    }
+
+    const imagePath = buildImagePathFromId(imageId)
+    if (!imagePath) {
+        return ''
+    }
+
+    return `${SHOP_BASE_URL}/img/p/${imagePath}-${size}.jpg`
 }
 
 // Singulariser les noms de ressources pour trouver les balises d'items (ex: categories → category, products → product, etc)
@@ -91,6 +171,130 @@ export function getHttpErrorMessage(status) {
     return 'Erreur ' + status
 }
 
+function extractResourceItemId(resourceItem) {
+    if (!resourceItem || typeof resourceItem !== 'object') {
+        return ''
+    }
+
+    const directId = String(resourceItem.id ?? '').trim()
+    if (directId) {
+        return directId
+    }
+
+    const resourceUrl = String(resourceItem.url ?? resourceItem.href ?? '').trim()
+    if (!resourceUrl) {
+        return ''
+    }
+
+    const match = resourceUrl.match(/\/(\d+)(?:\/?$)/)
+    return match ? match[1] : ''
+}
+
+async function deleteResourceById(resourceName, id) {
+    const controller = new AbortController()
+    const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+
+    try {
+        const base = BASE_URL.replace(/\/$/, '')
+        const url = `${base}/${resourceName}/${id}`
+
+        const res = await fetch(url, {
+            method: 'DELETE',
+            headers: {
+                ...getAuthHeaders(),
+            },
+            signal: controller.signal,
+        })
+
+        if (!res.ok) {
+            throw new Error(getHttpErrorMessage(res.status))
+        }
+
+        return true
+    } catch (error) {
+        if (error.name === 'AbortError') {
+            throw new Error('Timeout API')
+        }
+
+        throw error instanceof Error ? error : new Error(String(error))
+    } finally {
+        window.clearTimeout(timeoutId)
+    }
+}
+
+export async function deleteCriticalResourcesData() {
+    const resourcesToDelete = [
+        { resourceName: 'taxes', label: 'tax' },
+        { resourceName: 'tax_rules', label: 'tax_rule' },
+        { resourceName: 'tax_rule_groups', label: 'tax_rules_group' },
+        { resourceName: 'categories', label: 'categories', keepIds: ['1', '2'] },
+        { resourceName: 'customers', label: 'customers' },
+        { resourceName: 'addresses', label: 'addresses' },
+        { resourceName: 'orders', label: 'orders' },
+        { resourceName: 'order_histories', label: 'order_history' },
+        { resourceName: 'products', label: 'products' },
+        { resourceName: 'carts', label: 'carts' },
+    ]
+
+    const results = []
+
+    for (const resource of resourcesToDelete) {
+        const summary = {
+            resource: resource.resourceName,
+            label: resource.label,
+            deleted: [],
+            skipped: [],
+            errors: [],
+            deletedCount: 0,
+            skippedCount: 0,
+            errorCount: 0,
+            totalCount: 0,
+        }
+
+        try {
+            const items = await getRessourceData(resource.resourceName)
+            const ids = items
+                .map((item) => extractResourceItemId(item))
+                .filter(Boolean)
+
+            const idsToDelete = resource.keepIds && resource.keepIds.length > 0
+                ? ids.filter((id) => !resource.keepIds.includes(String(id)))
+                : ids
+
+            summary.totalCount = ids.length
+            summary.skipped = ids.filter((id) => resource.keepIds && resource.keepIds.includes(String(id)))
+            summary.skippedCount = summary.skipped.length
+
+            for (const id of idsToDelete) {
+                try {
+                    await deleteResourceById(resource.resourceName, id)
+                    summary.deleted.push(id)
+                } catch (error) {
+                    summary.errors.push({
+                        id,
+                        message: error instanceof Error ? error.message : String(error),
+                        timestamp: new Date().toISOString(),
+                    })
+                }
+            }
+
+            summary.deletedCount = summary.deleted.length
+            summary.errorCount = summary.errors.length
+        } catch (error) {
+            summary.errors.push({
+                id: null,
+                message: error instanceof Error ? error.message : String(error),
+                timestamp: new Date().toISOString(),
+            })
+            summary.errorCount = summary.errors.length
+        }
+
+        results.push(summary)
+    }
+
+    return results
+}
+
 // maka anle /api/ rehetra
 export async function getRessources() {
     const controller = new AbortController()
@@ -130,14 +334,16 @@ export async function getRessources() {
 }
 
 // maka ny data anle ressource manokana (ohatra products, categories, etc)
-export async function getRessourceData(ressourceName) {
+export async function getRessourceData(ressourceName, options = {}) {
     const controller = new AbortController()
     const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+    const queryParams = buildCollectionQueryParams(options)
+    const queryString = queryParams.toString()
 
     let res
 
     try {
-        res = await fetch(`${BASE_URL}/${ressourceName}`, {
+        res = await fetch(queryString ? `${BASE_URL}/${ressourceName}?${queryString}` : `${BASE_URL}/${ressourceName}`, {
         // ito le manome authorization header raha misy API key, raha tsy misy dia tsy asiana
         headers: {
             ...getAuthHeaders(),
@@ -305,6 +511,74 @@ export function convertCsvDataToXml(resourceName, rows, languages = [1]) {
             `
 
     return xml
+}
+
+function formatCollectionQueryValue(value) {
+    if (value == null || value === '') {
+        return null
+    }
+
+    if (Array.isArray(value)) {
+        return `[${value.map((item) => String(item ?? '').trim()).join(',')}]`
+    }
+
+    if (typeof value === 'object') {
+        const minValue = value.min ?? value.from ?? ''
+        const maxValue = value.max ?? value.to ?? ''
+        return `[${String(minValue ?? '').trim()},${String(maxValue ?? '').trim()}]`
+    }
+
+    const stringValue = String(value).trim()
+    if (!stringValue) {
+        return null
+    }
+
+    if (stringValue.startsWith('[') && stringValue.endsWith(']')) {
+        return stringValue
+    }
+
+    return `[${stringValue}]`
+}
+
+function buildCollectionQueryParams(options = {}) {
+    const params = new URLSearchParams()
+
+    const display = options.display
+    if (display) {
+        if (Array.isArray(display)) {
+            params.set('display', `[${display.join(',')}]`)
+        } else {
+            params.set('display', String(display))
+        }
+    }
+
+    const page = Number(options.page ?? 0)
+    const perPage = Number(options.perPage ?? 0)
+    if (page > 0 && perPage > 0) {
+        const offset = Math.max(0, (page - 1) * perPage)
+        params.set('limit', `${offset},${perPage}`)
+    } else if (Number(options.limit ?? 0) > 0) {
+        params.set('limit', String(options.limit))
+    }
+
+    if (options.sort) {
+        params.set('sort', String(options.sort))
+    }
+
+    const filters = options.filters && typeof options.filters === 'object'
+        ? options.filters
+        : {}
+
+    for (const [fieldName, fieldValue] of Object.entries(filters)) {
+        const formattedValue = formatCollectionQueryValue(fieldValue)
+        if (!formattedValue) {
+            continue
+        }
+
+        params.set(`filter[${fieldName}]`, formattedValue)
+    }
+
+    return params
 }
 
 export function convertRowsToIndividualXml(resourceName, rows, columnMappings = [], languages = [1], referenceLookups = {}) {
@@ -529,7 +803,7 @@ export function convertRowsToIndividualXml(resourceName, rows, columnMappings = 
 
     return rows.map((row) => {
         const rowFields = {
-            ...(defaultValues[normalizedResource] || {})
+            ...defaultValues[normalizedResource]
         }
         let rawName = ''
         let rawPriceTtc = null
@@ -868,6 +1142,67 @@ export async function updateResourceData(resourceName, resourceId, xmlData)
         window.clearTimeout(timeoutId)
     }
 }
+export async function patchResourceData(resourceName, resourceId, xmlData)
+{
+    if (!resourceName) {
+        throw new Error('resourceName required')
+    }
+    
+    if (!resourceId) {
+        throw new Error('resourceId required')
+    }
+    
+    if (!xmlData) {
+        throw new Error('xml data required')
+    }
+    
+    const controller = new AbortController()
+    
+    const timeoutId = window.setTimeout(
+        () => controller.abort(),
+        REQUEST_TIMEOUT_MS
+    )
+    
+    try {
+        const base = BASE_URL.replace(/\/$/, '')
+        const url = `${base}/${resourceName}/${resourceId}`
+        
+        const res = await fetch(url, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/xml',
+                ...getAuthHeaders(),
+            },
+            body: xmlData,
+            signal: controller.signal,
+        })
+        
+        if (!res.ok) {
+            const statusText = `${res.status} ${res.statusText}`
+            const errorText = await res.text()
+            try {
+                console.error(`[API] PATCH ${url} failed: ${statusText}`)
+                console.error('[API] Response body:', errorText)
+                console.error('[API] Payload (truncated):', String(xmlData ?? '').slice(0, 2000))
+            } catch (e) {
+                // ignore logging errors
+            }
+            throw new Error(`API PATCH ${statusText}: ${String(errorText).slice(0, 2000)}`)
+        }
+        
+        return await res.text()
+    } catch (error) {
+        if (error.name === 'AbortError') {
+            throw new Error('Timeout API')
+        }
+        
+        throw error instanceof Error
+            ? error
+            : new Error(String(error))
+    } finally {
+        window.clearTimeout(timeoutId)
+    }
+}
 
 // récupérer l'XML brut d'un élément (utile pour reconstruire et PUT sans perdre de champs)
 export async function getRessourceItemXml(resourceName, id) {
@@ -1024,3 +1359,280 @@ export function setOrCreateXmlField(parentNode, fieldName, value, xmlDoc) {
     element.appendChild(xmlDoc.createCDATASection(String(value)))
     return element
 }
+
+// ─── Gestion des images produits ──────────────────────────────────────────
+
+export async function getProductByReferenceForImage(reference) {
+    const cleanedReference = String(reference ?? '').trim()
+    
+    if (!cleanedReference) {
+        return null
+    }
+    
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+    
+    try {
+        const url = `${BASE_URL}/products?display=[id,reference]&filter[reference]=[${encodeURIComponent(cleanedReference)}]`
+        const res = await fetch(url, {
+            headers: getAuthHeaders(),
+            signal: controller.signal
+        })
+        
+        if (!res.ok) {
+            throw new Error(getHttpErrorMessage(res.status))
+        }
+        
+        const xmlText = await res.text()
+        const parser = new DOMParser()
+        const xmlDoc = parser.parseFromString(xmlText, 'application/xml')
+        
+        if (xmlDoc.documentElement.nodeName === 'parsererror') {
+            return null
+        }
+        
+        const productNode = xmlDoc.getElementsByTagName('product')[0]
+        if (!productNode) {
+            return null
+        }
+        
+        const idNode = productNode.getElementsByTagName('id')[0]
+        const referenceNode = productNode.getElementsByTagName('reference')[0]
+        
+        return {
+            id: String(idNode?.textContent ?? '').trim(),
+            reference: String(referenceNode?.textContent ?? '').trim()
+        }
+    } catch (error) {
+        console.error(`[API] Erreur recherche produit ${cleanedReference}:`, error)
+        return null
+    } finally {
+        clearTimeout(timeoutId)
+    }
+}
+
+export async function uploadProductImage(productId, imageFile, imageName = '') {
+    if (!productId) {
+        throw new Error('ID produit requis')
+    }
+    
+    if (!imageFile || !(imageFile instanceof File)) {
+        throw new Error('Fichier image invalide')
+    }
+    
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS * 2) // 20s timeout pour upload
+    
+    try {
+        const formData = new FormData()
+        formData.append('image', imageFile, imageName || imageFile.name)
+        
+        const base = BASE_URL.replace(/\/$/, '')
+        const url = `${base}/images/products/${productId}`
+        
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: {
+                ...getAuthHeaders(),
+                // Ne pas setter Content-Type, le navigateur le fera avec le boundary
+            },
+            body: formData,
+            signal: controller.signal
+        })
+        
+        if (!res.ok) {
+            const errorText = await res.text()
+            throw new Error(`HTTP ${res.status}: ${errorText.slice(0, 200)}`)
+        }
+        
+        const responseText = await res.text()
+        
+        // Extraire l'ID de l'image créée depuis la réponse XML
+        const parser = new DOMParser()
+        const xmlDoc = parser.parseFromString(responseText, 'application/xml')
+        const imageNode = xmlDoc.getElementsByTagName('image')[0]
+        const idNode = imageNode?.getElementsByTagName('id')[0]
+        const imageId = String(idNode?.textContent ?? '').trim()
+        
+        return {
+            success: true,
+            imageId: imageId || 'unknown',
+            message: `Image uploadée avec succès`
+        }
+    } catch (error) {
+        if (error.name === 'AbortError') {
+            throw new Error('Timeout lors de l\'upload')
+        }
+        throw error
+    } finally {
+        clearTimeout(timeoutId)
+    }
+}
+
+export async function importImagesFromZip(zipFile, onProgress = null, onLog = null) {
+    const results = {
+        success: [],
+        notFound: [],
+        errors: [],
+        skipped: [],
+        total: 0,
+        processed: 0
+    }
+    
+    if (!zipFile || !(zipFile instanceof File)) {
+        throw new Error('Fichier ZIP invalide')
+    }
+    
+    try {
+        if (onLog) onLog('📦 Décompression du fichier ZIP...', 'info')
+        
+        const zip = await JSZip.loadAsync(zipFile)
+        const files = []
+        
+        // Parcourir tous les fichiers du ZIP
+        for (const [filename, zipEntry] of Object.entries(zip.files)) {
+            // Ignorer les dossiers
+            if (zipEntry.dir) continue
+            
+            // Ignorer les fichiers/dossiers système Mac
+            if (filename.startsWith('__MACOSX/') || 
+                filename.includes('/__MACOSX/') ||
+                filename.startsWith('._') ||
+                filename.includes('/._')) {
+                if (onLog) onLog(`⏭️ Fichier système ignoré: ${filename}`, 'skip')
+                results.skipped.push({ file: filename, reason: 'Fichier système (__MACOSX)' })
+                continue
+            }
+            
+            // Ignorer les fichiers cachés Unix (commencent par .)
+            const baseName = filename.split('/').pop()
+            if (baseName.startsWith('.')) {
+                if (onLog) onLog(`⏭️ Fichier caché ignoré: ${filename}`, 'skip')
+                results.skipped.push({ file: filename, reason: 'Fichier caché' })
+                continue
+            }
+            
+            // Ignorer les fichiers .DS_Store
+            if (baseName === '.DS_Store') {
+                if (onLog) onLog(`⏭️ .DS_Store ignoré: ${filename}`, 'skip')
+                results.skipped.push({ file: filename, reason: '.DS_Store' })
+                continue
+            }
+            
+            // Vérifier l'extension
+            const ext = filename.split('.').pop().toLowerCase()
+            const allowedExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif']
+            if (!allowedExtensions.includes(ext)) {
+                if (onLog) onLog(`⏭️ Fichier ignoré (extension non supportée): ${filename}`, 'skip')
+                results.skipped.push({ file: filename, reason: 'Extension non supportée' })
+                continue
+            }
+            
+            // Extraire la référence (nom sans extension, en ignorant le chemin)
+            const nameWithExt = filename.split('/').pop()
+            const baseNameOnly = nameWithExt.substring(0, nameWithExt.lastIndexOf('.'))
+            
+            // Nettoyer la référence: garder uniquement les caractères alphanumériques, tirets, underscores
+            const reference = baseNameOnly.replace(/[^a-zA-Z0-9_-]/g, '')
+            
+            if (!reference) {
+                if (onLog) onLog(`⏭️ Fichier ignoré (nom invalide): ${filename}`, 'skip')
+                results.skipped.push({ file: filename, reason: 'Nom de fichier invalide pour la référence' })
+                continue
+            }
+            
+            files.push({
+                filename: nameWithExt,
+                fullPath: filename,
+                reference,
+                ext,
+                zipEntry
+            })
+        }
+        
+        results.total = files.length
+        if (onLog) onLog(`📁 ${results.total} fichier(s) image trouvé(s) dans le ZIP`, 'info')
+        
+        // 2. Traiter chaque fichier
+        for (let i = 0; i < files.length; i++) {
+            const { filename, reference, ext, zipEntry, fullPath } = files[i]
+            
+            try {
+                // Mise à jour progression
+                if (onProgress) {
+                    onProgress({
+                        current: i + 1,
+                        total: results.total,
+                        reference,
+                        status: 'processing'
+                    })
+                }
+                
+                if (onLog) onLog(`🔍 Recherche du produit: ${reference}`, 'info')
+                
+                // 3. Rechercher le produit par référence
+                const product = await getProductByReferenceForImage(reference)
+                
+                if (!product || !product.id) {
+                    if (onLog) onLog(`❌ Produit non trouvé: ${reference}`, 'error')
+                    results.notFound.push({ file: filename, reference })
+                    continue
+                }
+                
+                if (onLog) onLog(`✅ Produit trouvé: ${reference} (ID: ${product.id})`, 'success')
+                
+                // 4. Lire le contenu du fichier image
+                const imageBlob = await zipEntry.async('blob')
+                const imageFile = new File([imageBlob], filename, { type: `image/${ext === 'jpg' ? 'jpeg' : ext}` })
+                
+                // 5. Upload de l'image
+                if (onLog) onLog(`📤 Upload de l'image: ${filename}`, 'info')
+                const uploadResult = await uploadProductImage(product.id, imageFile, filename)
+                
+                if (uploadResult.success) {
+                    if (onLog) onLog(`✅ Image importée: ${reference} → ${filename} (ID image: ${uploadResult.imageId})`, 'success')
+                    results.success.push({
+                        file: filename,
+                        reference,
+                        productId: product.id,
+                        imageId: uploadResult.imageId
+                    })
+                } else {
+                    throw new Error(uploadResult.message || 'Upload failed')
+                }
+                
+            } catch (error) {
+                const errorMsg = error instanceof Error ? error.message : String(error)
+                if (onLog) onLog(`❌ Erreur pour ${reference}: ${errorMsg}`, 'error')
+                results.errors.push({
+                    file: filename,
+                    reference,
+                    error: errorMsg
+                })
+            }
+            
+            results.processed = i + 1
+        }
+        
+        // Résumé final
+        if (onLog) {
+            onLog('', 'info')
+            onLog('═══════════════════════════════════════════════════', 'info')
+            onLog(`📊 RÉSUMÉ DE L'IMPORT:`, 'info')
+            onLog(`✅ Succès: ${results.success.length}`, 'success')
+            onLog(`❌ Produits non trouvés: ${results.notFound.length}`, 'error')
+            onLog(`⚠️ Erreurs techniques: ${results.errors.length}`, 'error')
+            onLog(`⏭️ Fichiers ignorés: ${results.skipped.length}`, 'skip')
+            onLog(`📁 Total traités: ${results.processed}/${results.total}`, 'info')
+            onLog('═══════════════════════════════════════════════════', 'info')
+        }
+        
+        return results
+        
+    } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error)
+        if (onLog) onLog(`💥 Erreur fatale: ${errorMsg}`, 'error')
+        throw error
+    }
+}
+

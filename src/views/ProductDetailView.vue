@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { getRessourceItemById } from "../services/ressourcesService.js";
+import { buildProductImageUrl, getRessourceItemById } from "../services/ressourcesService.js";
 import { addCart, updateCart, getCartByCustomerId, getCartByGuestId } from "../services/CartService.js";
 import {
   getQuantityAvailableByProductId,
@@ -41,6 +41,7 @@ const isCombinationProduct = computed(() => product.value?.product_type === "com
 const selectedProductAttributeId = computed(() =>
   Number(selectedQuantityAttribute.value?.id_product_attribute ?? 0)
 );
+const productImageUrl = computed(() => buildProductImageUrl(product.value));
 
 function getActiveSessionInfo() {
   try {
@@ -228,6 +229,15 @@ onMounted(() => {
     <p v-else-if="error">{{ error }}</p>
 
     <div v-else-if="product">
+      <div v-if="productImageUrl" style="margin-bottom: 16px;">
+        <img
+          :src="productImageUrl"
+          :alt="product?.name?.language || product?.name || 'Produit'"
+          width="220"
+          height="220"
+          style="object-fit: cover; border-radius: 12px; display: block;"
+        />
+      </div>
         <p><strong>ID :</strong> {{ product.id }}</p>
         <p><strong>Référence :</strong> {{ product.reference }}</p>
         <p><strong>Nom :</strong> {{ product.name?.language || product.name }}</p>

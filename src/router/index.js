@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import ReinitialisationView from '../views/ReinitialisationView.vue'
 import TestCsvView from '../views/TestCsvView.vue'
 import ImportCsvView from '../views/ImportCsvView.vue'
+import FileImportView from '../views/FileImportView.vue'
 import LoginView from '../views/LoginView.vue'
 import CommandeView from '../views/CommandeView.vue'
 import ProductView from '../views/ProductView.vue'
@@ -14,6 +15,8 @@ import CustomerLoginView from '../views/CustomerLoginView.vue'
 import StockView from '../views/StockView.vue'
 import StockSummaryView from '../views/StockSummaryView.vue'
 import OrderHistoryView from '../views/OrderHistoryView.vue'
+import ImportCsvMultiView from '../views/ImportCsvMultiView.vue'
+import QuickDeleteView from '../views/QuickDeleteView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -22,6 +25,12 @@ const router = createRouter({
       path: '/reset',
       name: 'reinitialisation',
       component: ReinitialisationView,
+      meta: { requiresAuth: 'admin' },
+    },
+    {
+      path: '/quick-delete',
+      name: 'quick-delete',
+      component: QuickDeleteView,
       meta: { requiresAuth: 'admin' },
     },
     {
@@ -34,6 +43,18 @@ const router = createRouter({
       path: '/importcsv',
       name: 'importcsv',
       component: ImportCsvView,
+      meta: { requiresAuth: 'admin' },
+    },
+    {
+      path: '/fileimport',
+      name: 'fileimport',
+      component: FileImportView,
+      meta: { requiresAuth: 'admin' },
+    },
+    {
+      path: '/importcsvmulti',
+      name: 'importcsvmulti',
+      component: ImportCsvMultiView,
       meta: { requiresAuth: 'admin' },
     },
     {
@@ -161,7 +182,7 @@ router.beforeEach((to, from) => {
   if (required === true && !admin && !guest && !customer) return '/'
 
   // Redirections après login selon session
-  if (to.path === '/' && admin) return '/orders'
+  if (to.path === '/' && admin) return '/dashboard'
   if (to.path === '/' && (guest || customer) && !admin) return '/products'
 
   return true

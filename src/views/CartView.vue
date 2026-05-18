@@ -2,7 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { getCartByCustomerId, getCartByGuestId, updateQuantityCart, deleteCartRow } from '../services/CartService.js'
-import { getRessourceItemById } from '../services/ressourcesService.js'
+import { buildProductImageUrl, getRessourceItemById } from '../services/ressourcesService.js'
 import { getCombinationValues } from '../services/stockService.js'
 import { getRateByTaxRulesGroupId } from '../services/productService.js'
 
@@ -101,6 +101,7 @@ async function fetchCart() {
           let groupLabel = '-'
           let valueLabel = '-'
           let pricePlus = 0
+          let imageUrl = ''
 
           try {
             const product = await getRessourceItemById('products', idProduct)
@@ -108,6 +109,7 @@ async function fetchCart() {
             reference = product?.reference || '-'
             basePrice = Number(product?.price ?? 0)
             taxRate = Number(await getRateByTaxRulesGroupId(product?.id_tax_rules_group))
+            imageUrl = buildProductImageUrl(product)
           } catch (productError) {
             console.warn('Impossible de charger le produit pour la ligne panier:', {
               idProduct,
@@ -144,6 +146,7 @@ async function fetchCart() {
             pricePlus: priceFormatter.format(pricePlus),
             taxRate: priceFormatter.format(taxRate),
             rowPrice: priceFormatter.format(rowPrice),
+            imageUrl,
           }
         })
       )
@@ -169,8 +172,9 @@ function Commander() {
     return
   }
 
+  localStorage.setItem('customerCart', String(cart.value.id))
   // Rediriger vers la page de validation de commande
-  router.push('/validate-order')
+  router.push({ path: '/validate-order', query: { cartId: String(cart.value.id) } })
 }
 async function ModifierQuantite(id_product, quantity) {
   alert(`Modifier la quantité du produit ${id_product} à ${quantity} dans le panier`)
@@ -212,6 +216,7 @@ onMounted(fetchCart)
           <table border="1">
             <thead>
               <tr>
+                <th>Image</th>
                 <th>Produit ID</th>
                 <th>Nom</th>
                 <th>Référence</th>
@@ -228,6 +233,16 @@ onMounted(fetchCart)
             </thead>
             <tbody>
               <tr v-for="(row, idx) in rowDetails" :key="idx">
+                <td>
+                  <img
+                    v-if="row.imageUrl"
+                    :src="row.imageUrl"
+                    :alt="row.productName"
+                    width="56"
+                    height="56"
+                    style="object-fit: cover; border-radius: 8px; display: block;"
+                  />
+                </td>
                 <td>{{ row.id_product }}</td>
                 <td>{{ row.productName }}</td>
                 <td>{{ row.reference }}</td>

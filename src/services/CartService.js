@@ -1,6 +1,8 @@
 import { getRessourceData, getRessourceItemById, getRessourceItemXmlShemaBlank, insertResourceData, getRessourceItemXml, updateResourceData, setOrCreateXmlField } from './ressourcesService.js'
+import { getAddressIdByCustomerId } from './customerService.js'
 const DEFAULT_ID_CURRENCY = 1
 const DEFAULT_ID_LANG = 1
+const DEFAULT_ID_CARRIER = 1
 
 export async function addCart(productId, qty, id_customer, id_product_attribute, isGuest = false) 
 {
@@ -20,15 +22,22 @@ export async function addCart(productId, qty, id_customer, id_product_attribute,
         throw new Error('Invalid cart XML schema')
     }
 
+    
+    const id_address = await getAddressIdByCustomerId(id_customer)
+    console.log('[CartService:addCart] retrieved address id', { id_address })
+
     // Champs obligatoires
     setOrCreateXmlField(cartNode, 'id_lang', String(DEFAULT_ID_LANG), xmlDoc)
     setOrCreateXmlField(cartNode, 'id_currency', String(DEFAULT_ID_CURRENCY), xmlDoc)
+    // setOrCreateXmlField(cartNode, 'id_carrier', String(DEFAULT_ID_CARRIER), xmlDoc)
     if (isGuest) {
         setOrCreateXmlField(cartNode, 'id_customer', '0', xmlDoc)
         setOrCreateXmlField(cartNode, 'id_guest', String(id_customer), xmlDoc)
     } else {
         setOrCreateXmlField(cartNode, 'id_guest', '0', xmlDoc)
         setOrCreateXmlField(cartNode, 'id_customer', String(id_customer), xmlDoc)
+        setOrCreateXmlField(cartNode, 'id_address_delivery', String(id_address), xmlDoc)
+        setOrCreateXmlField(cartNode, 'id_address_invoice', String(id_address), xmlDoc)
     }
 
     // Cart row
@@ -49,10 +58,12 @@ export async function addCart(productId, qty, id_customer, id_product_attribute,
         cartRowsNode.appendChild(cartRow)
     }
 
+
     setOrCreateXmlField(cartRow, 'id_product', String(productId), xmlDoc)
     setOrCreateXmlField(cartRow, 'id_product_attribute', String(id_product_attribute), xmlDoc)
-    setOrCreateXmlField(cartRow, 'id_address_delivery', '0', xmlDoc)
     setOrCreateXmlField(cartRow, 'quantity', String(qty), xmlDoc)
+    setOrCreateXmlField(cartRow, 'id_address_delivery', String(id_address), xmlDoc)
+
 
     const serializer = new XMLSerializer()
     const finalXml = serializer.serializeToString(xmlDoc)
@@ -84,6 +95,7 @@ export async function updateCart(cartId, productId, qty, id_product_attribute)
 
     // Champs obligatoires
     setOrCreateXmlField(cartNode, 'id', String(cartId), xmlDoc)
+    // setOrCreateXmlField(cartNode, 'id_carrier', String(DEFAULT_ID_CARRIER), xmlDoc)
 
     // Conserver les cart_row existants et en ajouter un nouveau à la fin
     let cartRowsNode = cartNode.getElementsByTagName('cart_rows')[0]
@@ -101,9 +113,19 @@ export async function updateCart(cartId, productId, qty, id_product_attribute)
     const cartRow = xmlDoc.createElement('cart_row')
     cartRowsNode.appendChild(cartRow)
 
+    const idCustomerNode = cartNode.getElementsByTagName('id_customer')[0]
+    const idGuestNode = cartNode.getElementsByTagName('id_guest')[0]
+    const customerId = String(idCustomerNode?.textContent ?? idGuestNode?.textContent ?? '').trim()
+    if (!customerId || customerId === '0') {
+        throw new Error('Unable to resolve customer id from cart')
+    }
+
+    const id_address = await getAddressIdByCustomerId(customerId)
+    console.log('[CartService:updateCart] retrieved address id', { id_address })
+
     setOrCreateXmlField(cartRow, 'id_product', String(productId), xmlDoc)
     setOrCreateXmlField(cartRow, 'id_product_attribute', String(id_product_attribute), xmlDoc)
-    setOrCreateXmlField(cartRow, 'id_address_delivery', '0', xmlDoc)
+    setOrCreateXmlField(cartRow, 'id_address_delivery', String(id_address), xmlDoc)
     setOrCreateXmlField(cartRow, 'quantity', String(qty), xmlDoc)
 
     const serializer = new XMLSerializer()
@@ -129,6 +151,7 @@ export async function updateQuantityCart(cartId, productId, qty)
         throw new Error('Invalid cart XML schema')
     }
     setOrCreateXmlField(cartNode, 'id', String(cartId), xmlDoc)
+    // setOrCreateXmlField(cartNode, 'id_carrier', String(DEFAULT_ID_CARRIER), xmlDoc)
     const cartRowsNode = cartNode.getElementsByTagName('cart_rows')[0]
     if (!cartRowsNode) {
         throw new Error('No cart_rows found in cart XML')
@@ -171,33 +194,31 @@ export async function getCartByCustomerId(id_customer) {
         const cartsDetails = await Promise.all(carts.map((cart) => getRessourceItemById('carts', cart.id)))
 
         // Filter by customer only
-        let candidateCarts = cartsDetails.filter((cart) => String(cart.id_customer) === String(id_customer))
+        const candidateCarts = cartsDetails
+            .filter((cart) => String(cart.id_customer) === String(id_customer))
+            .sort((a, b) => Number(b.id) - Number(a.id))
 
         console.log('[CartService:getCartByCustomerId] candidate carts', candidateCarts.map((cart) => cart.id))
 
         if (candidateCarts.length === 0) return null
 
-        // Exclude carts that are already linked to orders (orders.id_cart)
+        // Only the most recent cart can be active.
+        // If it is already linked to an order, the customer has no active cart,
+        // even if older carts are still unassigned.
         const orders = await getRessourceData('orders')
         const ordersDetails = await Promise.all(orders.map((o) => getRessourceItemById('orders', o.id)))
         const orderCartIds = new Set(ordersDetails.map((o) => String(o.id_cart)))
 
-        candidateCarts = candidateCarts.filter((cart) => !orderCartIds.has(String(cart.id)))
+        const latestCart = candidateCarts[0]
+        const latestCartId = String(latestCart?.id ?? '')
+        const latestCartHasOrder = orderCartIds.has(latestCartId)
 
-        console.log('[CartService:getCartByCustomerId] carts without order', candidateCarts.map((cart) => cart.id))
+        console.log('[CartService:getCartByCustomerId] latest cart', latestCart?.id ?? null)
+        console.log('[CartService:getCartByCustomerId] latest cart linked to order', latestCartHasOrder)
 
-        if (candidateCarts.length === 0) return null
+        if (latestCartHasOrder) return null
 
-        // Return the cart with the largest id (highest id_cart)
-        let maxId = -Infinity
-        let selected = null
-        for (const c of candidateCarts) {
-            const numericId = Number(c.id)
-            if (!Number.isNaN(numericId) && numericId > maxId) {
-                maxId = numericId
-                selected = c
-            }
-        }
+        const selected = latestCart
 
         console.log('[CartService:getCartByCustomerId] selected cart', selected?.id ?? null)
 
@@ -219,33 +240,31 @@ export async function getCartByGuestId(id_guest) {
         const cartsDetails = await Promise.all(carts.map((cart) => getRessourceItemById('carts', cart.id)))
 
         // Filter by customer only
-        let candidateCarts = cartsDetails.filter((cart) => String(cart.id_guest) === String(id_guest))
+        const candidateCarts = cartsDetails
+            .filter((cart) => String(cart.id_guest) === String(id_guest))
+            .sort((a, b) => Number(b.id) - Number(a.id))
 
         console.log('[CartService:getCartByGuestId] candidate carts', candidateCarts.map((cart) => cart.id))
 
         if (candidateCarts.length === 0) return null
 
-        // Exclude carts that are already linked to orders (orders.id_cart)
+        // Only the most recent cart can be active.
+        // If it is already linked to an order, the guest has no active cart,
+        // even if older carts are still unassigned.
         const orders = await getRessourceData('orders')
         const ordersDetails = await Promise.all(orders.map((o) => getRessourceItemById('orders', o.id)))
         const orderCartIds = new Set(ordersDetails.map((o) => String(o.id_cart)))
 
-        candidateCarts = candidateCarts.filter((cart) => !orderCartIds.has(String(cart.id)))
+        const latestCart = candidateCarts[0]
+        const latestCartId = String(latestCart?.id ?? '')
+        const latestCartHasOrder = orderCartIds.has(latestCartId)
 
-        console.log('[CartService:getCartByGuestId] carts without order', candidateCarts.map((cart) => cart.id))
+        console.log('[CartService:getCartByGuestId] latest cart', latestCart?.id ?? null)
+        console.log('[CartService:getCartByGuestId] latest cart linked to order', latestCartHasOrder)
 
-        if (candidateCarts.length === 0) return null
+        if (latestCartHasOrder) return null
 
-        // Return the cart with the largest id (highest id_cart)
-        let maxId = -Infinity
-        let selected = null
-        for (const c of candidateCarts) {
-            const numericId = Number(c.id)
-            if (!Number.isNaN(numericId) && numericId > maxId) {
-                maxId = numericId
-                selected = c
-            }
-        }
+        const selected = latestCart
 
         console.log('[CartService:getCartByCustomerId] selected cart', selected?.id ?? null)
 
@@ -321,6 +340,7 @@ export async function deleteCartRow(cartId, productId, id_product_attribute) {
     })
 
     setOrCreateXmlField(cartNode, 'id', String(cartId), xmlDoc)
+    // setOrCreateXmlField(cartNode, 'id_carrier', String(DEFAULT_ID_CARRIER), xmlDoc)
     const serializer = new XMLSerializer()
     const finalXml = serializer.serializeToString(xmlDoc)
     await updateResourceData('carts', cartId, finalXml)

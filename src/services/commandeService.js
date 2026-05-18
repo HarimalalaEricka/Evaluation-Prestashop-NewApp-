@@ -4,40 +4,134 @@ import { getRateByTaxRulesGroupId } from './productService.js'
 import { getCombinationValues } from './stockService.js'
 const DEFAULT_ID_CURRENCY = 1
 const DEFAULT_ID_LANG = 1
+const DEFAULT_ID_SHOP_GROUP = String(import.meta.env.VITE_ID_SHOP_GROUP ?? '1').trim() || '1'
 const DEFAULT_MODULE = 'ps_cashondelivery'
-const DEFAULT_ID_CARRIER = 2 // id 2 = livraison gratuite
+const DEFAULT_ID_CARRIER = 0 // id 1 = livraison gratuite
 const DEFAULT_STATE = 2 // id = 2 => paiement accepté
+
+function normalizeShopId(value, fallback) {
+    const cleanedValue = String(value ?? '').trim()
+    return cleanedValue && cleanedValue !== '0' ? cleanedValue : fallback
+}
+
+function normalizeText(value) {
+    return String(value ?? '').trim().toLowerCase()
+}
+
+async function buildCommandeDetailsList(commandeItems) {
+    const commandesDetails = []
+
+    for (const commande of commandeItems) {
+        if (!commande?.id) {
+            continue
+        }
+
+        const commandeDetails = await getRessourceItemById('orders', commande.id)
+        const stateDetails = await getRessourceItemById('order_states', commandeDetails.current_state)
+        const stateName = stateDetails?.name
+        commandeDetails.current_state_label =
+            (typeof stateName === 'string' && stateName.trim()) ||
+            (Array.isArray(stateName) && stateName.find((item) => typeof item === 'string' && item.trim())) ||
+            (stateName?.language && String(stateName.language).trim()) ||
+            String(commandeDetails.current_state ?? '').trim()
+
+        const customerDetails = await getRessourceItemById('customers', commandeDetails.id_customer)
+        commandeDetails.customer_name = customerDetails?.lastname
+
+        const deliveryDetails = await getRessourceItemById('addresses', commandeDetails.id_address_delivery)
+        commandeDetails.city = deliveryDetails?.city
+
+        commandesDetails.push(commandeDetails)
+    }
+
+    return commandesDetails
+}
+
+function applyCommandeFilters(commandes, filters = {}) {
+    const searchReference = normalizeText(filters.reference)
+    const searchCustomer = normalizeText(filters.customer)
+    const searchCity = normalizeText(filters.city)
+    const searchState = normalizeText(filters.state)
+
+    return commandes.filter((commande) => {
+        const reference = normalizeText(commande?.reference)
+        const customerName = normalizeText(commande?.customer_name)
+        const city = normalizeText(commande?.city)
+        const stateLabel = normalizeText(commande?.current_state_label)
+
+        const matchesReference = searchReference ? reference.includes(searchReference) : true
+        const matchesCustomer = searchCustomer ? customerName.includes(searchCustomer) : true
+        const matchesCity = searchCity ? city.includes(searchCity) : true
+        const matchesState = searchState ? stateLabel.includes(searchState) : true
+
+        return matchesReference && matchesCustomer && matchesCity && matchesState
+    })
+}
+
+export async function getCommandesPage({ page = 1, perPage = 10, filters = {} } = {}) {
+    const rawFilters = {}
+
+    if (filters.reference) {
+        rawFilters.reference = `[%${String(filters.reference).trim()}%]`
+    }
+
+    if (filters.customerId) {
+        rawFilters.id_customer = String(filters.customerId)
+    }
+
+    if (filters.stateId) {
+        rawFilters.current_state = String(filters.stateId)
+    }
+
+    const commandeItems = await getRessourceData('orders', {
+        display: ['id'],
+        page,
+        perPage: perPage + 1,
+        filters: rawFilters,
+        sort: 'id_DESC',
+    })
+
+    const hasMore = commandeItems.length > perPage
+    const visibleItems = commandeItems.slice(0, perPage)
+    const commandesDetails = await buildCommandeDetailsList(visibleItems)
+
+    return {
+        items: applyCommandeFilters(commandesDetails, filters),
+        hasMore,
+    }
+}
+
+export async function getOrderHistoryPage(id_customer, { page = 1, perPage = 10, filters = {} } = {}) {
+    if (!id_customer) {
+        throw new Error('id_customer is required')
+    }
+
+    const commandeItems = await getRessourceData('orders', {
+        display: ['id'],
+        page,
+        perPage: perPage + 1,
+        filters: {
+            id_customer: String(id_customer),
+        },
+        sort: 'id_DESC',
+    })
+
+    const hasMore = commandeItems.length > perPage
+    const visibleItems = commandeItems.slice(0, perPage)
+    const commandesDetails = await buildCommandeDetailsList(visibleItems)
+
+    return {
+        items: applyCommandeFilters(commandesDetails, filters),
+        hasMore,
+    }
+}
 
 export async function getAllCommandes()
 {
-    const commandesDetails = []
     try
     {
         const commandes = await getRessourceData('orders')
-        for( const commande of commandes )
-        {
-            if(!commande?.id)
-            {
-                continue
-            }
-            const commandeDetails = await getRessourceItemById('orders', commande.id)
-            const stateDetails = await getRessourceItemById('order_states', commandeDetails.current_state)
-            const stateName = stateDetails?.name
-            commandeDetails.current_state_label =
-                (typeof stateName === 'string' && stateName.trim()) ||
-                (Array.isArray(stateName) && stateName.find((item) => typeof item === 'string' && item.trim())) ||
-                (stateName?.language && String(stateName.language).trim()) ||
-                String(commandeDetails.current_state ?? '').trim()
-
-            const customerDetails = await getRessourceItemById('customers', commandeDetails.id_customer)
-            commandeDetails.customer_name = customerDetails?.lastname 
-
-            const deliveryDetails = await getRessourceItemById('addresses', commandeDetails.id_address_delivery)
-            commandeDetails.city = deliveryDetails?.city 
-
-            commandesDetails.push(commandeDetails)
-        }
-        return commandesDetails
+        return await buildCommandeDetailsList(commandes)
     }catch (error) {
         throw error instanceof Error ? error : new Error(String(error))
     }
@@ -124,9 +218,12 @@ export async function insertOrder(id_cart)
     setOrCreateXmlField(orderNode, 'id_address_delivery', String(cart.id_address_delivery), xmlDoc)
     setOrCreateXmlField(orderNode, 'id_address_invoice', String(cart.id_address_invoice), xmlDoc)
     setOrCreateXmlField(orderNode, 'id_cart', String(id_cart), xmlDoc)
-    setOrCreateXmlField(orderNode, 'id_carrier', DEFAULT_ID_CARRIER, xmlDoc)
-    setOrCreateXmlField(orderNode, 'current_state', DEFAULT_STATE, xmlDoc)
+    // MIJANONA LOA FA LIVRAISON GRATUITE
+    setOrCreateXmlField(orderNode, 'id_carrier', String(DEFAULT_ID_CARRIER), xmlDoc)
+    setOrCreateXmlField(orderNode, 'current_state', String(DEFAULT_STATE), xmlDoc)
     setOrCreateXmlField(orderNode, 'secure_key', cart.secure_key, xmlDoc)
+    setOrCreateXmlField(orderNode, 'id_shop', String(cart.id_shop), xmlDoc)
+    setOrCreateXmlField(orderNode, 'id_shop_group', normalizeShopId(cart.id_shop_group, DEFAULT_ID_SHOP_GROUP), xmlDoc)
 
     setOrCreateXmlField(orderNode, 'module', DEFAULT_MODULE, xmlDoc)
     setOrCreateXmlField(orderNode, 'payment', 'Paiement comptant à la livraison (Cash on delivery)', xmlDoc)
@@ -138,20 +235,21 @@ export async function insertOrder(id_cart)
     for (let i = 0; i < cartProducts.length; i++) {
         const product = cartProducts[i]
         const produit = await getRessourceItemById('products', product.id_product)
-            let priceTTC = parseFloat(produit.price) // Base product price
+            let pricebase = parseFloat(produit.price) // Base product price
         
             // Pour les produits avec combinaison, ajouter le prix de l'attribut
             if (String(product.id_product_attribute) !== '0' && product.id_product_attribute) {
                 try {
                     const combinationValues = await getCombinationValues(product.id_product_attribute)
                     const pricePlus = Number(combinationValues[0]?.pricePlus ?? 0)
-                    priceTTC += pricePlus
+                    console.log('EXTRA', pricePlus)
+                    pricebase += pricePlus
                 } catch (combError) {
                     console.warn('Impossible de charger le prix de la combinaison:', combError)
                 }
             }
-        
-            let ht = priceTTC * product.quantity // ht 
+            console.log('PRICE',pricebase)
+            let ht = pricebase * product.quantity // ht 
         const rate = await getRateByTaxRulesGroupId(produit.id_tax_rules_group)
         let ttc = ht * (1 + rate / 100); 
         
@@ -167,8 +265,8 @@ export async function insertOrder(id_cart)
         setOrCreateXmlField(orderRow, 'product_quantity', String(product.quantity), xmlDoc)
         setOrCreateXmlField(orderRow, 'product_name', String(produit.name), xmlDoc)
         setOrCreateXmlField(orderRow, 'product_reference', String(produit.reference), xmlDoc)
-        total_paid += ttc
-        total_products += ht
+        total_paid += ttc.toFixed(2)
+        total_products += ht.toFixed(2)
     }
 
     setOrCreateXmlField(orderNode, 'total_paid', String(total_paid), xmlDoc) 
@@ -184,7 +282,7 @@ export async function insertOrder(id_cart)
     
     console.log('XML envoyé pour création de commande:', finalXml.substring(0, 1000))
     const result = await insertResourceData('orders', finalXml)
-    // console.log('Commande créée:', result)
+    console.log('Commande créée:', result)
     
     return result
     // return await insertResourceData('orders', finalXml)
@@ -260,26 +358,10 @@ export async function getOrdersByCustomerId(id_customer)
         throw new Error('id_customer is required')
     }
 
-    const commandesDetails = []
     try {
         const commandes = await getRessourceData('orders')
-        for (const commande of commandes) {
-            const commandeDetails = await getRessourceItemById('orders', commande.id)
-            if( commandeDetails?.id_customer != id_customer) continue
-            const stateDetails = await getRessourceItemById('order_states', commandeDetails.current_state)
-            const stateName = stateDetails?.name
-            commandeDetails.current_state_label =
-                (typeof stateName === 'string' && stateName.trim()) ||
-                (Array.isArray(stateName) && stateName.find((item) => typeof item === 'string' && item.trim())) ||
-                (stateName?.language && String(stateName.language).trim()) ||
-                String(commandeDetails.current_state ?? '').trim()
-
-            const deliveryDetails = await getRessourceItemById('addresses', commandeDetails.id_address_delivery)
-            commandeDetails.city = deliveryDetails?.city
-
-            commandesDetails.push(commandeDetails)
-        }
-        return commandesDetails
+        const commandesDetails = await buildCommandeDetailsList(commandes)
+        return commandesDetails.filter((commande) => String(commande?.id_customer ?? '') === String(id_customer))
     } catch (error) {
         throw error instanceof Error ? error : new Error(String(error))
     }
@@ -288,11 +370,22 @@ export async function getOrdersByCustomerId(id_customer)
 export async function GetCartsGroupByDate()
 {
     const carts = await getRessourceData('carts')
+    const orders = await getRessourceData('orders')
+    const ordersDetails = await Promise.all(orders.map((order) => getRessourceItemById('orders', order.id)))
+    const orderCartIds = new Set(
+        ordersDetails
+            .map((order) => String(order?.id_cart ?? '').trim())
+            .filter(Boolean)
+    )
     const groupedByDate = {}
 
     try {
         for (const cart of carts) {
             if (!cart?.id) {
+                continue
+            }
+
+            if (orderCartIds.has(String(cart.id))) {
                 continue
             }
 
@@ -340,7 +433,7 @@ export async function GetCartsGroupByDate()
                 const ht = price * qty
                 const rate = Number(await getRateByTaxRulesGroupId(produit?.id_tax_rules_group) ?? 0)
                 const ttc = ht * (1 + (rate || 0) / 100)
-                cartTotal += Number.isFinite(ttc) ? ttc : 0
+                cartTotal += Number.isFinite(ht) ? ttc : 0
             }
 
             groupedByDate[dateKey].total_amount += cartTotal
@@ -460,3 +553,4 @@ export async function SumDashboardWithFilters(filterType = 'all')
         throw error instanceof Error ? error : new Error(String(error))
     }
 }
+

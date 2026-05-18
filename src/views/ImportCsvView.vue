@@ -2,6 +2,7 @@
 import Papa from 'papaparse';
 import { getRessourceData, getRessources, getRessourceSchema, convertRowsToIndividualXml, updateResourceData, insertResourceData } from '../services/ressourcesService.js'
 import { ensureSimpleProductStock, forceProductCombinationMode, getCategoryNameLookup, getTaxRulesGroupRateLookup, getTaxRuleGroupsByRateLookup, importCustomerOrders, prepareRowsForProductImport, prepareVariantImportOperations, upsertStockAvailable } from '../services/importService.js'
+import { deleteAllResourceData, resetResources } from '../services/deleteService.js'
 
 export default {
     data() {
@@ -75,7 +76,7 @@ export default {
                 .normalize('NFD')
                 .replace(/[\u0300-\u036f]/g, '')
                 .replace(/\*/g, '')
-                .replace(/[()\/\-_.]/g, ' ')
+                .replace(/[()/\-_.]/g, ' ')
                 .replace(/[^a-z0-9]+/g, '')
         },
 
@@ -329,6 +330,36 @@ export default {
             ]
         },
 
+        async deleteLastForSelectedResource() {
+            if (!this.selectedRessource) {
+                this.showMessage('Aucune ressource sélectionnée', 'error')
+                return
+            }
+            const ok = confirm(`Confirmer la suppression de toutes les données de la ressource '${this.selectedRessource}' ?`)
+            if (!ok) return
+
+            try {
+                const res = await deleteAllResourceData(this.selectedRessource)
+                this.showMessage(`Suppression terminée pour ${this.selectedRessource}: ${res.deletedCount || 0} élément(s) supprimé(s)`, 'success')
+            } catch (err) {
+                this.showMessage(`Erreur suppression: ${err instanceof Error ? err.message : String(err)}`, 'error')
+            }
+        },
+
+        async resetCriticalResources() {
+            const critical = ['customers', 'orders', 'products', 'combinations', 'carts']
+            const ok = confirm(`Confirmer la suppression de toutes les données pour les ressources critiques: ${critical.join(', ')} ?`)
+            if (!ok) return
+
+            try {
+                const results = await resetResources(critical)
+                console.log('Reset critical resources results:', results)
+                this.showMessage('Reset terminé (voir console pour détails)', 'success')
+            } catch (err) {
+                this.showMessage(`Erreur reset: ${err instanceof Error ? err.message : String(err)}`, 'error')
+            }
+        },
+
         suggestFieldForColumn(csvColumn) {
             const normalized = this.normalizeHeader(csvColumn)
             const schemaLookup = this.getSchemaFieldLookup()
@@ -533,6 +564,18 @@ export default {
                     const prepared = await importCustomerOrders(this.content.data, this.languageIds)
                     results.success = prepared.success || 0
 
+                    // If import reported errors, attempt to reset critical resources (remove last created)
+                    if (Array.isArray(prepared.errors) && prepared.errors.length > 0) {
+                        try {
+                            const critical = ['customers', 'orders', 'products', 'combinations', 'carts']
+                            console.warn('[IMPORT] Errors detected, attempting reset of critical resources:', critical)
+                            const resetRes = await resetResources(critical)
+                            console.log('[IMPORT] Reset results:', resetRes)
+                        } catch (resetErr) {
+                            console.error('[IMPORT] Reset resources failed:', resetErr)
+                        }
+                    }
+
                     if (Array.isArray(prepared.errors) && prepared.errors.length > 0) {
                         results.errors.push(...prepared.errors.map((item, index) => ({
                             index,
@@ -730,6 +773,16 @@ export default {
                 if (results.errors.length === 0) {
                     this.showMessage(`Import terminé : ${results.success} lignes importées`, 'success')
                 } else {
+                    // En cas d'erreurs, tenter de réinitialiser les ressources critiques
+                    try {
+                        const critical = ['customers', 'orders', 'products', 'combinations', 'carts']
+                        console.warn('[IMPORT] Erreurs détectées, tentative de reset des ressources critiques')
+                        const resetRes = await resetResources(critical)
+                        console.log('[IMPORT] Résultats reset:', resetRes)
+                    } catch (resetErr) {
+                        console.error('[IMPORT] Échec du reset des ressources:', resetErr)
+                    }
+
                     this.showMessage(`Import partiel : ${results.success} réussies, ${results.errors.length} erreurs`, 'error')
                     console.error('Détails erreurs:', results.errors)
                 }
@@ -763,6 +816,8 @@ export default {
                 </option>
             </select>
             <button type="button" @click="loadSelectedRessource" :disabled="!selectedRessource">Charger</button>
+            <button type="button" @click="deleteLastForSelectedResource" :disabled="!selectedRessource" style="margin-left:8px;">Supprimer toutes les données</button>
+            <button type="button" @click="resetCriticalResources" style="margin-left:8px;">Reset ressources critiques</button>
         </div>
 
         <hr />
