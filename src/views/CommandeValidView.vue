@@ -208,42 +208,46 @@ onMounted(() => {
       <!-- Infos client -->
       <h2>Informations sur le client</h2>
       <table border="1" style="margin-bottom: 20px;">
-        <tr>
-          <th>Nom</th>
-          <td>{{ customer?.firstname || '-' }} {{ customer?.lastname || '-' }}</td>
-        </tr>
-        <tr>
-          <th>Email</th>
-          <td>{{ customer?.email || '-' }}</td>
-        </tr>
-        <tr>
-          <th>Type</th>
-          <td>{{ sessionInfo.type === 'customer' ? 'Client' : 'Invité' }}</td>
-        </tr>
+        <tbody>
+          <tr>
+            <th>Nom</th>
+            <td>{{ customer?.firstname || '-' }} {{ customer?.lastname || '-' }}</td>
+          </tr>
+          <tr>
+            <th>Email</th>
+            <td>{{ customer?.email || '-' }}</td>
+          </tr>
+          <tr>
+            <th>Type</th>
+            <td>{{ sessionInfo.type === 'customer' ? 'Client' : 'Invité' }}</td>
+          </tr>
+        </tbody>
       </table>
 
       <!-- Adresse de livraison -->
       <h2>Adresse de livraison</h2>
       <table border="1" style="margin-bottom: 20px;">
-        <tr v-if="address">
-          <th>Nom</th>
-          <td>{{ address?.firstname || '-' }} {{ address?.lastname || '-' }}</td>
-        </tr>
-        <tr v-if="address">
-          <th>Adresse</th>
-          <td>{{ address?.address1 || '-' }} {{ address?.address2 || '' }}</td>
-        </tr>
-        <tr v-if="address">
-          <th>Ville</th>
-          <td>{{ address?.city || '-' }} {{ address?.postcode || '' }}</td>
-        </tr>
-        <tr v-if="address">
-          <th>Pays</th>
-          <td>{{ address?.country || '-' }}</td>
-        </tr>
-        <tr v-if="!address">
-          <td colspan="2" style="text-align: center;">Aucune adresse de livraison</td>
-        </tr>
+        <tbody>
+          <tr v-if="address">
+            <th>Nom</th>
+            <td>{{ address?.firstname || '-' }} {{ address?.lastname || '-' }}</td>
+          </tr>
+          <tr v-if="address">
+            <th>Adresse</th>
+            <td>{{ address?.address1 || '-' }} {{ address?.address2 || '' }}</td>
+          </tr>
+          <tr v-if="address">
+            <th>Ville</th>
+            <td>{{ address?.city || '-' }} {{ address?.postcode || '' }}</td>
+          </tr>
+          <tr v-if="address">
+            <th>Pays</th>
+            <td>{{ address?.country || '-' }}</td>
+          </tr>
+          <tr v-if="!address">
+            <td colspan="2" style="text-align: center;">Aucune adresse de livraison</td>
+          </tr>
+        </tbody>
       </table>
 
       <!-- Résumé du panier -->

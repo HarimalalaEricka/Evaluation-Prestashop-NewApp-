@@ -220,12 +220,11 @@ onMounted(fetchCart)
                 <th>Produit ID</th>
                 <th>Nom</th>
                 <th>Référence</th>
-                <th>Attribut ID</th>
                 <th>Groupe</th>
                 <th>Valeur</th>
-                <th>Prix base</th>
-                <th>Prix plus</th>
-                <th>Tax rate</th>
+                <!-- <th>Prix base</th> -->
+                <!-- <th>Prix plus</th> -->
+                <!-- <th>Tax rate</th> -->
                 <th>Prix final</th>
                 <th>Quantité</th>
                 <th>Action</th>
@@ -246,12 +245,11 @@ onMounted(fetchCart)
                 <td>{{ row.id_product }}</td>
                 <td>{{ row.productName }}</td>
                 <td>{{ row.reference }}</td>
-                <td>{{ row.id_product_attribute }}</td>
                 <td>{{ row.groupLabel }}</td>
                 <td>{{ row.valueLabel }}</td>
-                <td>{{ row.basePrice }}</td>
-                <td>{{ row.pricePlus }}</td>
-                <td>{{ row.taxRate }}</td>
+                <!-- <td>{{ row.basePrice }}</td> -->
+                <!-- <td>{{ row.pricePlus }}</td> -->
+                <!-- <td>{{ row.taxRate }}</td> -->
                 <td>{{ row.rowPrice }}</td>
                 <td>{{ row.quantity }}</td>
                 <td>
