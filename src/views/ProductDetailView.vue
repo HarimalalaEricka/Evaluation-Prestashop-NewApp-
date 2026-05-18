@@ -38,6 +38,9 @@ const formattedPriceWithSelectedAttribute = computed(() =>
 );
 
 const isCombinationProduct = computed(() => product.value?.product_type === "combinations");
+const selectedProductAttributeId = computed(() =>
+  Number(selectedQuantityAttribute.value?.id_product_attribute ?? 0)
+);
 
 function getActiveSessionInfo() {
   try {
@@ -170,15 +173,20 @@ async function ajouterPanier() {
       cartId,
       selectedAttribute: selectedQuantityAttribute.value,
       quantityToAdd,
-      id_product_attribute: product.value.id_product_attribute
+      id_product_attribute: selectedProductAttributeId.value
     });
+
+    if (isCombinationProduct.value && !selectedQuantityAttribute.value) {
+      alert("Sélectionnez un attribut avant d'ajouter ce produit au panier");
+      return;
+    }
 
     if (!cartUser || Number.isNaN(cartId) || cartId <= 0) {
       const createdCart = await addCart(
         product.value.id,
         quantityToAdd,
         activeSession.id,
-        selectedQuantityAttribute.value.id_product_attribute,
+        selectedProductAttributeId.value,
         isGuest
       );
       const createdCartId = extractCreatedCartId(createdCart);
@@ -195,7 +203,7 @@ async function ajouterPanier() {
       }
     } else {
       console.log('[ProductDetailView:ajouterPanier] updating existing cart', cartId);
-      await updateCart(cartId, product.value.id, quantityToAdd, selectedQuantityAttribute.value.id_product_attribute);
+      await updateCart(cartId, product.value.id, quantityToAdd, selectedProductAttributeId.value);
     }
     alert("Produit ajouté au panier");
   } catch (err) {
@@ -232,14 +240,19 @@ onMounted(() => {
         <p><strong>Prix :</strong> {{ formattedPriceWithSelectedAttribute }} €</p>
         <p><strong>Marque :</strong> {{ marque || "-" }}</p>
         <p><strong>État :</strong> {{ product.active }}</p>
-        <p>
-          <select v-if="isCombinationProduct" v-model="selectedQuantityAttribute">
+        <p v-if="isCombinationProduct">
+          <strong>Attribut :</strong>
+          <select v-model="selectedQuantityAttribute">
+                <option value="null" disabled>Sélectionnez un attribut</option>
                 <option 
                     v-for="quantity in quantityAvailableAttribute" 
                     :key="quantity.value"
               :value="quantity"
                 >{{ quantity.group }} - {{ quantity.value}} </option>
             </select>
+        </p>
+        <p v-else>
+          <strong>Type :</strong> Produit standard (pas de variation)
         </p>
         <p><strong>Quantité disponible :</strong> {{ quantityAvailable }}</p>
         <label for="quantity">Quantité :</label>

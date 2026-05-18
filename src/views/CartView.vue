@@ -1,11 +1,12 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { getCartByCustomerId, getCartByGuestId, updateQuantityCart, deleteCartRow } from '../services/CartService.js'
-import { insertOrder } from '../services/commandeService.js'
 import { getRessourceItemById } from '../services/ressourcesService.js'
 import { getCombinationValues } from '../services/stockService.js'
 import { getRateByTaxRulesGroupId } from '../services/productService.js'
 
+const router = useRouter()
 const sessionInfo = getSessionInfo()
 const cart = ref(null)
 const rowDetails = ref([])
@@ -157,19 +158,19 @@ async function fetchCart() {
   }
 }
 
-async function Commander() {
+function Commander() {
   if (!cart.value) {
     alert('Aucun panier actif trouvé pour ce client.')
     return
   }
 
-  try {
-    await insertOrder(cart.value.id)
-    alert('Commande créée avec succès !')
-  } catch (err) {
-    console.error('Erreur lors de la création de la commande :', err)
-    alert('Erreur lors de la création de la commande : ' + (err instanceof Error ? err.message : String(err)))
+  if (rowDetails.value.length === 0) {
+    alert('Le panier est vide')
+    return
   }
+
+  // Rediriger vers la page de validation de commande
+  router.push('/validate-order')
 }
 async function ModifierQuantite(id_product, quantity) {
   alert(`Modifier la quantité du produit ${id_product} à ${quantity} dans le panier`)

@@ -1,6 +1,7 @@
 import { getRessourceData, getRessourceItemById, updateResourceData, getRessourceItemXml, setOrCreateXmlField, getRessourceItemXmlShemaBlank, insertResourceData } from './ressourcesService.js'
 import { getCartProductsByCartId } from './CartService.js'
 import { getRateByTaxRulesGroupId } from './productService.js'
+import { getCombinationValues } from './stockService.js'
 const DEFAULT_ID_CURRENCY = 1
 const DEFAULT_ID_LANG = 1
 const DEFAULT_MODULE = 'ps_cashondelivery'
@@ -137,7 +138,20 @@ export async function insertOrder(id_cart)
     for (let i = 0; i < cartProducts.length; i++) {
         const product = cartProducts[i]
         const produit = await getRessourceItemById('products', product.id_product)
-        let ht = parseFloat(produit.price) * product.quantity // ht 
+            let priceTTC = parseFloat(produit.price) // Base product price
+        
+            // Pour les produits avec combinaison, ajouter le prix de l'attribut
+            if (String(product.id_product_attribute) !== '0' && product.id_product_attribute) {
+                try {
+                    const combinationValues = await getCombinationValues(product.id_product_attribute)
+                    const pricePlus = Number(combinationValues[0]?.pricePlus ?? 0)
+                    priceTTC += pricePlus
+                } catch (combError) {
+                    console.warn('Impossible de charger le prix de la combinaison:', combError)
+                }
+            }
+        
+            let ht = priceTTC * product.quantity // ht 
         const rate = await getRateByTaxRulesGroupId(produit.id_tax_rules_group)
         let ttc = ht * (1 + rate / 100); 
         
@@ -284,6 +298,7 @@ export async function GetCartsGroupByDate()
 
             const cartDetails = await getRessourceItemById('carts', cart.id)
             const cartProducts = await getCartProductsByCartId(cart.id)
+            console.log(`Cart ${cart.id} has products:`, cartProducts)
 
             // Extraire la date de création du panier sans convertir en UTC (éviter décalage de fuseau)
             const rawDate = cartDetails?.date_add
@@ -309,7 +324,18 @@ export async function GetCartsGroupByDate()
             let cartTotal = 0
             for (const product of cartProducts) {
                 const produit = await getRessourceItemById('products', product.id_product)
-                const price = Number(produit?.price ?? 0)
+                console.log(produit.associations.stock_availables.stock_available)
+                let combinationValue = []
+                let extra = 0
+                if( product.id_product_attribute != '0' )
+                {
+                    combinationValue = await getCombinationValues(product.id_product_attribute)
+                    console.log('Combination ', product.id_product_attribute, ' has values: ', combinationValue)
+                    extra = Number(combinationValue?.[0]?.pricePlus ?? 0)
+                }
+                console.log(`Product ${product.id_product} with attribute ${product.id_product_attribute} has base price ${produit.price} and extra ${extra}`)
+                const basePrice = Number(produit?.price ?? 0)
+                const price = basePrice + extra
                 const qty = Number(product?.quantity ?? 0)
                 const ht = price * qty
                 const rate = Number(await getRateByTaxRulesGroupId(produit?.id_tax_rules_group) ?? 0)
@@ -413,16 +439,20 @@ export async function SumDashboardWithFilters(filterType = 'all')
                     date: item.date,
                     total_orders: 0,
                     total_carts: 0,
+                    total_orders_amount: 0,
+                    total_carts_amount: 0,
                     total_amount: 0
                 }
             }
             if (item.type === 'commande') {
                 merged[item.date].total_orders += item.total_orders ?? 0
-                merged[item.date].total_amount += item.total_amount ?? 0
+                merged[item.date].total_orders_amount += item.total_amount ?? 0
             } else if (item.type === 'panier') {
                 merged[item.date].total_carts += item.total_carts ?? 0
-                merged[item.date].total_amount += item.total_amount ?? 0
+                merged[item.date].total_carts_amount += item.total_amount ?? 0
             }
+
+            merged[item.date].total_amount = merged[item.date].total_orders_amount + merged[item.date].total_carts_amount
         }
 
         return Object.values(merged).sort((a, b) => new Date(a.date) - new Date(b.date))

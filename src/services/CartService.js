@@ -271,7 +271,8 @@ export async function getCartProductsByCartId(id_cart)
         .filter((row) => row && row.id_product != null)
         .map((row) => ({
         id_product: row.id_product,
-        quantity: row.quantity
+        quantity: row.quantity,
+        id_product_attribute: row.id_product_attribute,
         }))
 }
 

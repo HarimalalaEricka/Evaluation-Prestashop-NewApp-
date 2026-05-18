@@ -7,6 +7,7 @@ import CommandeView from '../views/CommandeView.vue'
 import ProductView from '../views/ProductView.vue'
 import ProductDetailView from '../views/ProductDetailView.vue'
 import CartView from '../views/CartView.vue'
+import CommandeValidView from '../views/CommandeValidView.vue'
 import DashboardView from '../views/DashboardView.vue'
 import CustomerView from '../views/CustomerView.vue'
 import CustomerLoginView from '../views/CustomerLoginView.vue'
@@ -105,6 +106,13 @@ const router = createRouter({
       component: OrderHistoryView,
       // order history should be only for logged customers (not guests)
       meta: { requiresAuth: 'customer', allowGuest: false },
+      props: true,
+    },
+    {
+      path: '/validate-order',
+      name: 'validate-order',
+      component: CommandeValidView,
+      meta: { requiresAuth: 'customer', allowGuest: true },
       props: true,
     },
   ],
