@@ -1,8 +1,10 @@
 <script setup>
 import { onMounted, ref, computed } from 'vue'
+import { useRouter } from "vue-router";
 import { changeOrderState, getOrderState, getOrdersByCustomerId } from '../services/commandeService.js'
 import { usePagination } from '../composables/usePagination.js'
 
+const router = useRouter()
 const commandes = ref([])
 const allCommandes = ref([])
 const statesCommande = ref([])
@@ -93,6 +95,10 @@ async function onStateChange(commande, event) {
     }
 }
 
+function Dupliquer(productId) {
+    router.push({ name: 'order-valid', params: { id: productId, quantity:  document.getElementById('dupliquer').value} })
+}
+
 onMounted(() => {
     fetchCommandes()
 })
@@ -150,6 +156,10 @@ onMounted(() => {
                     <td>{{ commande?.current_state_label ?? '' }}</td>
                     <td>{{ commande?.date_add ?? '' }}</td>
                     <td>
+                        <input type="number" id="dupliquer" value="1" min="1" step="1" />
+                        <button @click="Dupliquer(commande.id)">Dupliquer</button>
+                    </td>
+                    <!-- <td>
                         <select :value="commande?.current_state ?? ''" @change="(e) => onStateChange(commande, e)">
                             <option
                                 v-for="state in statesCommande"
@@ -159,15 +169,15 @@ onMounted(() => {
                                 {{ state?.name ?? state?.id ?? state ?? '' }}
                             </option>
                         </select>
-                    </td>
+                    </td> -->
                 </tr>
             </tbody>
         </table>
 
-        <div v-if="orderPagination.totalPages > 1" style="margin-top: 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-            <button type="button" :disabled="orderPagination.currentPage === 1" @click="orderPagination.prevPage">Précédent</button>
-            <span>Page {{ orderPagination.currentPage }} / {{ orderPagination.totalPages }}</span>
-            <button type="button" :disabled="orderPagination.currentPage === orderPagination.totalPages" @click="orderPagination.nextPage">Suivant</button>
+        <div v-if="orderPagination.totalPages.value > 1" style="margin-top: 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <button type="button" :disabled="orderPagination.currentPage.value === 1" @click="orderPagination.prevPage">Précédent</button>
+            <span>Page {{ orderPagination.currentPage.value }} / {{ orderPagination.totalPages.value }}</span>
+            <button type="button" :disabled="orderPagination.currentPage.value === orderPagination.totalPages.value" @click="orderPagination.nextPage">Suivant</button>
         </div>
     </div>
 </template>

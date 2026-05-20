@@ -1,8 +1,11 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { SumDashboardWithFilters } from '../services/commandeService.js'
+import { usePagination } from '../composables/usePagination.js'
 const commandes = ref([])
 const commandesComplete = ref([])
+const dashboardPagination = usePagination(commandes, 10)
+const visibleCommandes = computed(() => dashboardPagination.paginatedItems.value ?? [])
 const sumOrder = ref({
     total_orders: 0,
     total_carts: 0,
@@ -54,6 +57,7 @@ function applyCurrentFilters() {
     const filteredCommandes = commandesComplete.value.filter((item) => isWithinSelectedDates(item.date))
 
     commandes.value = filteredCommandes
+    dashboardPagination.resetPage()
     updateSummary(filteredCommandes)
 }
 
@@ -123,7 +127,7 @@ onMounted(() => {
             </thead>
 
             <tbody>
-                <tr v-for="item in commandes" :key="item.date">
+                <tr v-for="item in visibleCommandes" :key="item.date">
                     <td>{{ item.date }}</td>
                     <td>{{ item.total_orders ?? 0 }}</td>
                     <td>{{ (item.total_orders_amount ?? 0).toFixed(2) }}</td>
@@ -143,5 +147,11 @@ onMounted(() => {
                 </tr>
             </tbody>
         </table>
+
+        <div v-if="dashboardPagination.totalPages.value > 1" style="margin-top: 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <button type="button" :disabled="dashboardPagination.currentPage.value === 1" @click="dashboardPagination.prevPage">Précédent</button>
+            <span>Page {{ dashboardPagination.currentPage.value }} / {{ dashboardPagination.totalPages.value }}</span>
+            <button type="button" :disabled="dashboardPagination.currentPage.value === dashboardPagination.totalPages.value" @click="dashboardPagination.nextPage">Suivant</button>
+        </div>
     </div>
 </template>

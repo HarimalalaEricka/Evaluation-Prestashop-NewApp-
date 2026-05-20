@@ -166,7 +166,30 @@ export async function getProductsPage({ page = 1, perPage = 10, filters = {}, so
 
 export async function getAllProducts() {
     try {
-        const products = await getRessourceData('products')
+        const perPage = 100
+        let page = 1
+        const products = []
+
+        while (true) {
+            const pageItems = await getRessourceData('products', {
+                display: ['id'],
+                page,
+                perPage,
+                sort: 'id_ASC',
+            })
+
+            if (!Array.isArray(pageItems) || pageItems.length === 0) {
+                break
+            }
+
+            products.push(...pageItems)
+
+            if (pageItems.length < perPage) {
+                break
+            }
+
+            page += 1
+        }
 
         return await buildProductDetailsList(products)
     } catch (error) {

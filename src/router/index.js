@@ -17,6 +17,8 @@ import StockSummaryView from '../views/StockSummaryView.vue'
 import OrderHistoryView from '../views/OrderHistoryView.vue'
 import ImportCsvMultiView from '../views/ImportCsvMultiView.vue'
 import QuickDeleteView from '../views/QuickDeleteView.vue'
+import BeneficeByCategorieView from '../views/BeneficeByCategorieView.vue'
+import ValidateCommandeView from '../views/ValidateCommandeView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -136,6 +138,20 @@ const router = createRouter({
       meta: { requiresAuth: 'customer', allowGuest: true },
       props: true,
     },
+    {
+      path: '/benefice-by-categorie',
+      name: 'benefice-by-categorie',
+      component: BeneficeByCategorieView,
+      meta: { requiresAuth: 'admin' },
+      props: true,
+    },
+    {
+      path: '/order-valid/:id/quantity/:quantity',
+      name: '/order-valid',
+      component: ValidateCommandeView,
+      meta: { requiresAuth: 'customer' },
+      props: true,
+    }
   ],
 })
 

@@ -9,7 +9,7 @@ const route = useRoute()
 const noNavbarRoutes = ['loginBO', 'loginCustomer']
 
 // Routes de backoffice
-const backofficeRoutes = ['dashboard', 'orders', 'stock', 'stockSummary', 'reinitialisation', 'quick-delete', 'importcsvmulti']
+const backofficeRoutes = ['dashboard', 'orders', 'stock', 'stockSummary', 'reinitialisation', 'quick-delete', 'importcsvmulti', 'benefice-by-categorie']
 
 const shouldShowNavbar = computed(() => !noNavbarRoutes.includes(route.name))
 const isBackoffice = computed(() => backofficeRoutes.includes(route.name))
@@ -53,6 +53,9 @@ const isAdmin = computed(() => {
           </li>
           <li v-if="isBackoffice">
             <router-link to="/quick-delete">Supprimer données</router-link>
+          </li>
+          <li v-if="isBackoffice">
+            <router-link to="/benefice-by-categorie">Categorie</router-link>
           </li>
           <li v-if="!isBackoffice">
             <router-link to="/loginBO">Admin</router-link>

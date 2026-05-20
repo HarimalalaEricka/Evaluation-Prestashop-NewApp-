@@ -1,233 +1,56 @@
 <?xml version="1.0" encoding="UTF-8"?>
-            <prestashop xmlns:xlink="http://www.w3.org/1999/xlink">
-            <categorie>
-            <ID>
-            <![CDATA[20]]>
-            </ID>
-            
-            <Actif(0/1)>
-            <![CDATA[1]]>
-            </Actif(0/1)>
-            
-            <Nom*>
-            <![CDATA[Smartphones]]>
-            </Nom*>
-            </categorie><categorie>
-            <ID>
-            <![CDATA[21]]>
-            </ID>
-            
-            <Actif(0/1)>
-            <![CDATA[1]]>
-            </Actif(0/1)>
-            
-            <Nom*>
-            <![CDATA[Audio]]>
-            </Nom*>
-            </categorie><categorie>
-            <ID>
-            <![CDATA[22]]>
-            </ID>
-            
-            <Actif(0/1)>
-            <![CDATA[1]]>
-            </Actif(0/1)>
-            
-            <Nom*>
-            <![CDATA[Monitors]]>
-            </Nom*>
-            </categorie><categorie>
-            <ID>
-            <![CDATA[23]]>
-            </ID>
-            
-            <Actif(0/1)>
-            <![CDATA[1]]>
-            </Actif(0/1)>
-            
-            <Nom*>
-            <![CDATA[Storage]]>
-            </Nom*>
-            </categorie><categorie>
-            <ID>
-            <![CDATA[24]]>
-            </ID>
-            
-            <Actif(0/1)>
-            <![CDATA[1]]>
-            </Actif(0/1)>
-            
-            <Nom*>
-            <![CDATA[Furniture]]>
-            </Nom*>
-            </categorie><categorie>
-            <ID>
-            <![CDATA[25]]>
-            </ID>
-            
-            <Actif(0/1)>
-            <![CDATA[1]]>
-            </Actif(0/1)>
-            
-            <Nom*>
-            <![CDATA[Networking]]>
-            </Nom*>
-            </categorie><categorie>
-            <ID>
-            <![CDATA[26]]>
-            </ID>
-            
-            <Actif(0/1)>
-            <![CDATA[1]]>
-            </Actif(0/1)>
-            
-            <Nom*>
-            <![CDATA[Wearables]]>
-            </Nom*>
-            </categorie><categorie>
-            <ID>
-            <![CDATA[27]]>
-            </ID>
-            
-            <Actif(0/1)>
-            <![CDATA[1]]>
-            </Actif(0/1)>
-            
-            <Nom*>
-            <![CDATA[Electronics]]>
-            </Nom*>
-            </categorie><categorie>
-            <ID>
-            <![CDATA[28]]>
-            </ID>
-            
-            <Actif(0/1)>
-            <![CDATA[1]]>
-            </Actif(0/1)>
-            
-            <Nom*>
-            <![CDATA[Tablets]]>
-            </Nom*>
-            </categorie><categorie>
-            <ID>
-            <![CDATA[29]]>
-            </ID>
-            
-            <Actif(0/1)>
-            <![CDATA[1]]>
-            </Actif(0/1)>
-            
-            <Nom*>
-            <![CDATA[Drones]]>
-            </Nom*>
-            </categorie><categorie>
-            <ID>
-            <![CDATA[30]]>
-            </ID>
-            
-            <Actif(0/1)>
-            <![CDATA[1]]>
-            </Actif(0/1)>
-            
-            <Nom*>
-            <![CDATA[Computers]]>
-            </Nom*>
-            </categorie><categorie>
-            <ID>
-            <![CDATA[31]]>
-            </ID>
-            
-            <Actif(0/1)>
-            <![CDATA[1]]>
-            </Actif(0/1)>
-            
-            <Nom*>
-            <![CDATA[Gaming]]>
-            </Nom*>
-            </categorie><categorie>
-            <ID>
-            <![CDATA[32]]>
-            </ID>
-            
-            <Actif(0/1)>
-            <![CDATA[1]]>
-            </Actif(0/1)>
-            
-            <Nom*>
-            <![CDATA[Cameras]]>
-            </Nom*>
-            </categorie><categorie>
-            <ID>
-            <![CDATA[33]]>
-            </ID>
-            
-            <Actif(0/1)>
-            <![CDATA[1]]>
-            </Actif(0/1)>
-            
-            <Nom*>
-            <![CDATA[Printers]]>
-            </Nom*>
-            </categorie><categorie>
-            <ID>
-            <![CDATA[34]]>
-            </ID>
-            
-            <Actif(0/1)>
-            <![CDATA[0]]>
-            </Actif(0/1)>
-            
-            <Nom*>
-            <![CDATA[Software]]>
-            </Nom*>
-            </categorie><categorie>
-            <ID>
-            <![CDATA[35]]>
-            </ID>
-            
-            <Actif(0/1)>
-            <![CDATA[1]]>
-            </Actif(0/1)>
-            
-            <Nom*>
-            <![CDATA[Components]]>
-            </Nom*>
-            </categorie><categorie>
-            <ID>
-            <![CDATA[36]]>
-            </ID>
-            
-            <Actif(0/1)>
-            <![CDATA[0]]>
-            </Actif(0/1)>
-            
-            <Nom*>
-            <![CDATA[Office]]>
-            </Nom*>
-            </categorie><categorie>
-            <ID>
-            <![CDATA[37]]>
-            </ID>
-            
-            <Actif(0/1)>
-            <![CDATA[1]]>
-            </Actif(0/1)>
-            
-            <Nom*>
-            <![CDATA[Informatique]]>
-            </Nom*>
-            </categorie><categorie>
-            <ID>
-            <![CDATA[38]]>
-            </ID>
-            
-            <Actif(0/1)>
-            <![CDATA[1]]>
-            </Actif(0/1)>
-            
-            <Nom*>
-            <![CDATA[Mobile]]>
-            </Nom*>
-            </categorie>
-            </prestashop>
-            
+<prestashop xmlns:xlink="http://www.w3.org/1999/xlink">
+    <order>
+        <id_address_delivery><![CDATA[463]]></id_address_delivery>
+        <id_address_invoice><![CDATA[463]]></id_address_invoice>
+        <id_cart><![CDATA[760]]></id_cart>
+        <id_currency><![CDATA[1]]></id_currency>
+        <id_lang><![CDATA[1]]></id_lang>
+        <id_customer><![CDATA[460]]></id_customer>
+        <id_carrier><![CDATA[1]]></id_carrier>
+        <current_state><![CDATA[6]]></current_state>
+        <module><![CDATA[ps_cashondelivery]]></module>
+        <valid><![CDATA[1]]></valid>
+        <date_add><![CDATA[2026-05-19 08:16:09]]></date_add>
+        <date_upd><![CDATA[2026-05-19 08:16:09]]></date_upd>
+        <id_shop_group><![CDATA[1]]></id_shop_group>
+        <id_shop><![CDATA[1]]></id_shop>
+        <secure_key><![CDATA[b09afbea5c2e0476a53a007c1482cf85]]></secure_key>
+        <payment><![CDATA[Import CSV]]></payment>
+        <conversion_rate><![CDATA[1]]></conversion_rate>
+        <total_discounts><![CDATA[]]></total_discounts>
+        <total_discounts_tax_incl><![CDATA[]]></total_discounts_tax_incl>
+        <total_discounts_tax_excl><![CDATA[]]></total_discounts_tax_excl>
+        <total_paid><![CDATA[35.00]]></total_paid>
+        <total_paid_tax_incl><![CDATA[35.00]]></total_paid_tax_incl>
+        <total_paid_tax_excl><![CDATA[31.59]]></total_paid_tax_excl>
+        <total_paid_real><![CDATA[35.00]]></total_paid_real>
+        <total_products><![CDATA[31.59]]></total_products>
+        <total_products_wt><![CDATA[35.00]]></total_products_wt>
+        <total_shipping><![CDATA[0]]></total_shipping>
+        <associations>
+            <order_rows>
+                <order_row>
+                    <product_id><![CDATA[415]]></product_id>
+                    <product_attribute_id><![CDATA[471]]></product_attribute_id>
+                    <product_quantity><![CDATA[2]]></product_quantity>
+                    <product_name><![CDATA[Tshirt - kely]]></product_name>
+                    <product_reference><![CDATA[T_01]]></product_reference>
+                    <product_price><![CDATA[13.43]]></product_price>
+                    <unit_price_tax_incl><![CDATA[15]]></unit_price_tax_incl>
+                    <unit_price_tax_excl><![CDATA[13.43]]></unit_price_tax_excl>
+                    </order_row>
+                    <order_row>
+                    <product_id><![CDATA[417]]></product_id>
+                    <product_attribute_id><![CDATA[0]]></product_attribute_id>
+                    <product_quantity><![CDATA[1]]></product_quantity>
+                    <product_name><![CDATA[Casquette]]></product_name>
+                    <product_reference><![CDATA[C_03]]></product_reference>
+                    <product_price><![CDATA[4.73]]></product_price>
+                    <unit_price_tax_incl><![CDATA[5]]></unit_price_tax_incl>
+                    <unit_price_tax_excl><![CDATA[4.73]]></unit_price_tax_excl>
+                </order_row>
+            </order_rows>
+        </associations>
+    </order>
+</prestashop>

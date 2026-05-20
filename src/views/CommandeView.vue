@@ -164,10 +164,10 @@ console.log(commandes.value)
             </tbody>
         </table>
 
-        <div v-if="commandePagination.totalPages > 1" style="margin-top: 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-            <button type="button" :disabled="commandePagination.currentPage === 1" @click="commandePagination.prevPage">Précédent</button>
-            <span>Page {{ commandePagination.currentPage }} / {{ commandePagination.totalPages }}</span>
-            <button type="button" :disabled="commandePagination.currentPage === commandePagination.totalPages" @click="commandePagination.nextPage">Suivant</button>
+        <div v-if="commandePagination.totalPages.value > 1" style="margin-top: 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <button type="button" :disabled="commandePagination.currentPage.value === 1" @click="commandePagination.prevPage">Précédent</button>
+            <span>Page {{ commandePagination.currentPage.value }} / {{ commandePagination.totalPages.value }}</span>
+            <button type="button" :disabled="commandePagination.currentPage.value === commandePagination.totalPages.value" @click="commandePagination.nextPage">Suivant</button>
         </div>
     </div>
 </template>

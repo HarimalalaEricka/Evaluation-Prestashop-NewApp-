@@ -1,0 +1,8 @@
+Par defaut importer ny sary refa cochena de tsy enregistrena zany
+Etat de mes commandes en tant que client 
+    asina bouton mifanitsy hoe cree une nouvelle commande ( otrany hoe dupliquer ) [ T mainty 3 -> dupliquer meme commande]
+        champ ( par defaut 1 ) afaka solona de fois anle izy ( T mainty 3 * 3 = 9)
+        valider -> mandalo ecran ray -> ao daholo ve sa tsy ampy anzao ny stock ( par rapport am stocknle produit) 
+            tsy afaka validena raha tsy ampy
+            afaka validena raha ampy
+            Etat -> livre 

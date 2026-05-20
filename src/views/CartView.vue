@@ -269,10 +269,10 @@ onMounted(fetchCart)
               </tr>
             </tbody>
           </table>
-          <div v-if="cartPagination.totalPages > 1" style="margin-top: 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-            <button type="button" :disabled="cartPagination.currentPage === 1" @click="cartPagination.prevPage">Précédent</button>
-            <span>Page {{ cartPagination.currentPage }} / {{ cartPagination.totalPages }}</span>
-            <button type="button" :disabled="cartPagination.currentPage === cartPagination.totalPages" @click="cartPagination.nextPage">Suivant</button>
+          <div v-if="cartPagination.totalPages.value > 1" style="margin-top: 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <button type="button" :disabled="cartPagination.currentPage.value === 1" @click="cartPagination.prevPage">Précédent</button>
+            <span>Page {{ cartPagination.currentPage.value }} / {{ cartPagination.totalPages.value }}</span>
+            <button type="button" :disabled="cartPagination.currentPage.value === cartPagination.totalPages.value" @click="cartPagination.nextPage">Suivant</button>
           </div>
         </div>
       </div>

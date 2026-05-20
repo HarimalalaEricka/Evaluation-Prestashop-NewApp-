@@ -151,10 +151,10 @@ console.log(produits.value)
             </tbody>
         </table>
 
-        <div v-if="productPagination.totalPages > 1" style="margin-top: 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-            <button type="button" :disabled="productPagination.currentPage === 1" @click="productPagination.prevPage">Précédent</button>
-            <span>Page {{ productPagination.currentPage }} / {{ productPagination.totalPages }}</span>
-            <button type="button" :disabled="productPagination.currentPage === productPagination.totalPages" @click="productPagination.nextPage">Suivant</button>
+        <div v-if="productPagination.totalPages.value > 1" style="margin-top: 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <button type="button" :disabled="productPagination.currentPage.value === 1" @click="productPagination.prevPage">Précédent</button>
+            <span>Page {{ productPagination.currentPage.value }} / {{ productPagination.totalPages.value }}</span>
+            <button type="button" :disabled="productPagination.currentPage.value === productPagination.totalPages.value" @click="productPagination.nextPage">Suivant</button>
         </div>
     </div>
 </template>

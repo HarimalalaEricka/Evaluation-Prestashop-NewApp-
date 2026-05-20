@@ -294,10 +294,10 @@ onMounted(() => {
         </tbody>
       </table>
 
-      <div v-if="orderRowPagination.totalPages > 1" style="margin-top: 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-        <button type="button" :disabled="orderRowPagination.currentPage === 1" @click="orderRowPagination.prevPage">Précédent</button>
-        <span>Page {{ orderRowPagination.currentPage }} / {{ orderRowPagination.totalPages }}</span>
-        <button type="button" :disabled="orderRowPagination.currentPage === orderRowPagination.totalPages" @click="orderRowPagination.nextPage">Suivant</button>
+      <div v-if="orderRowPagination.totalPages.value > 1" style="margin-top: 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+        <button type="button" :disabled="orderRowPagination.currentPage.value === 1" @click="orderRowPagination.prevPage">Précédent</button>
+        <span>Page {{ orderRowPagination.currentPage.value }} / {{ orderRowPagination.totalPages.value }}</span>
+        <button type="button" :disabled="orderRowPagination.currentPage.value === orderRowPagination.totalPages.value" @click="orderRowPagination.nextPage">Suivant</button>
       </div>
 
       <!-- Mode de livraison et paiement -->

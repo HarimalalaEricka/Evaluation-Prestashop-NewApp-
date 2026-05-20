@@ -132,10 +132,10 @@ onMounted(() => {
             
         </table>
 
-        <div v-if="stockPagination.totalPages > 1" style="margin-top: 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-            <button type="button" :disabled="stockPagination.currentPage === 1" @click="stockPagination.prevPage">Précédent</button>
-            <span>Page {{ stockPagination.currentPage }} / {{ stockPagination.totalPages }}</span>
-            <button type="button" :disabled="stockPagination.currentPage === stockPagination.totalPages" @click="stockPagination.nextPage">Suivant</button>
+        <div v-if="stockPagination.totalPages.value > 1" style="margin-top: 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <button type="button" :disabled="stockPagination.currentPage.value === 1" @click="stockPagination.prevPage">Précédent</button>
+            <span>Page {{ stockPagination.currentPage.value }} / {{ stockPagination.totalPages.value }}</span>
+            <button type="button" :disabled="stockPagination.currentPage.value === stockPagination.totalPages.value" @click="stockPagination.nextPage">Suivant</button>
         </div>
     </div>
 </template>

@@ -93,10 +93,10 @@ function resetDateFilter() {
             </tbody>
         </table>
 
-        <div v-if="stockSummaryPagination.totalPages > 1" style="margin-top: 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-            <button type="button" :disabled="stockSummaryPagination.currentPage === 1" @click="stockSummaryPagination.prevPage">Précédent</button>
-            <span>Page {{ stockSummaryPagination.currentPage }} / {{ stockSummaryPagination.totalPages }}</span>
-            <button type="button" :disabled="stockSummaryPagination.currentPage === stockSummaryPagination.totalPages" @click="stockSummaryPagination.nextPage">Suivant</button>
+        <div v-if="stockSummaryPagination.totalPages.value > 1" style="margin-top: 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <button type="button" :disabled="stockSummaryPagination.currentPage.value === 1" @click="stockSummaryPagination.prevPage">Précédent</button>
+            <span>Page {{ stockSummaryPagination.currentPage.value }} / {{ stockSummaryPagination.totalPages.value }}</span>
+            <button type="button" :disabled="stockSummaryPagination.currentPage.value === stockSummaryPagination.totalPages.value" @click="stockSummaryPagination.nextPage">Suivant</button>
         </div>
 
         <h3 style="margin-top: 32px;">Mouvements par Déclinaison</h3>
@@ -126,10 +126,10 @@ function resetDateFilter() {
             </tbody>
         </table>
 
-        <div v-if="stockSummaryAttributePagination.totalPages > 1" style="margin-top: 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-            <button type="button" :disabled="stockSummaryAttributePagination.currentPage === 1" @click="stockSummaryAttributePagination.prevPage">Précédent</button>
-            <span>Page {{ stockSummaryAttributePagination.currentPage }} / {{ stockSummaryAttributePagination.totalPages }}</span>
-            <button type="button" :disabled="stockSummaryAttributePagination.currentPage === stockSummaryAttributePagination.totalPages" @click="stockSummaryAttributePagination.nextPage">Suivant</button>
+        <div v-if="stockSummaryAttributePagination.totalPages.value > 1" style="margin-top: 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <button type="button" :disabled="stockSummaryAttributePagination.currentPage.value === 1" @click="stockSummaryAttributePagination.prevPage">Précédent</button>
+            <span>Page {{ stockSummaryAttributePagination.currentPage.value }} / {{ stockSummaryAttributePagination.totalPages.value }}</span>
+            <button type="button" :disabled="stockSummaryAttributePagination.currentPage.value === stockSummaryAttributePagination.totalPages.value" @click="stockSummaryAttributePagination.nextPage">Suivant</button>
         </div>
     </div>
 </template>

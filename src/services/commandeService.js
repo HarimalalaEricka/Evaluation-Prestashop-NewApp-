@@ -156,7 +156,7 @@ export async function getOrderState()
                 (stateName?.language && String(stateName.language ?? stateName.language).trim()) ||
                 String(etat.id ?? '').trim()
 
-            if (stateLabel === 'Paiement accepté' || stateLabel === 'Annulé') {
+            if (stateLabel === 'Paiement accepté' || stateLabel === 'Annulé' || stateLabel === 'Livré') {
                 states.push({
                     id: String(etat.id),
                     name: stateLabel,
@@ -465,6 +465,7 @@ export async function SumOrdersGroupByDateWithStatus(orderStatus = 'all')
                 (Array.isArray(stateName) && stateName.find((item) => typeof item === 'string' && item.trim())) ||
                 (stateName?.language && String(stateName.language).trim()) ||
                 String(commandeDetails.current_state ?? '').trim()
+            if (stateDetails.id =='6' ) continue // annulé
 
             // Filtrer par statut si spécifié
             if (orderStatus !== 'all' && stateLabel !== orderStatus) {
@@ -519,10 +520,10 @@ export async function SumDashboardWithFilters(filterType = 'all')
             result = result.concat(orders.map(o => ({...o, type: 'commande', status: 'Paiement accepté'})))
         }
 
-        if (filterType === 'annule') {
-            const orders = await SumOrdersGroupByDateWithStatus('Annulé')
-            result = result.concat(orders.map(o => ({...o, type: 'commande', status: 'Annulé'})))
-        }
+        // if (filterType === 'annule') {
+        //     const orders = await SumOrdersGroupByDateWithStatus('Annulé')
+        //     result = result.concat(orders.map(o => ({...o, type: 'commande', status: 'Annulé'})))
+        // }
 
         // Fusionner par date si nécessaire
         const merged = {}
@@ -554,3 +555,13 @@ export async function SumDashboardWithFilters(filterType = 'all')
     }
 }
 
+export async function checkQuantity( id_commande, quantity)
+{
+    let stocks = []
+    try {
+        const commandes = await getRessourceItemById('orders', id_commande);
+        console.log("commandes", commandes)
+    } catch (error) {
+        
+    }
+}

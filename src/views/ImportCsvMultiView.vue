@@ -149,6 +149,14 @@
                 </span>
             </div>
         </div>
+        <div>
+            <label for="import image">Importer Image</label>
+             <input
+                :checked="true"
+                type="checkbox"
+                @change="ImportImage()"
+            />
+        </div>
 
         <!-- ── Bouton global unique ───────────────────────────────────── -->
         <div style="text-align: center; margin-top: 8px; margin-bottom: 30px;">
@@ -171,6 +179,7 @@
                 {{ isImporting ? 'Import en cours...' : '🚀 Importer tout' }}
             </button>
         </div>
+
 
         <!-- ── Barre de progression globale ───────────────────────────── -->
         <div v-if="isImporting && globalProgress.total > 0" style="margin-bottom: 30px;">
@@ -362,6 +371,7 @@ export default {
             },
             languageIds: [1],
             isImporting: false,
+            isImportImage: true,
             globalMessage: '',
             globalMessageType: '',
             globalLogs: [],
@@ -395,6 +405,11 @@ export default {
     },
 
     methods: {
+        ImportImage()
+        {
+            this.isImportImage = false
+        },
+
         // ── Logs ─────────────────────────────────────────────────────────
         addGlobalLog(message, type = 'info') {
             this.globalLogs.unshift({
@@ -704,6 +719,7 @@ export default {
 
         // ── IMPORT GLOBAL UNIQUE ──────────────────────────────────────────
         async importAll() {
+
             this.isImporting = true
             this.globalLogs = []
             this.globalSummary = null
@@ -802,35 +818,38 @@ export default {
                 }
 
                 // 4. IMPORT IMAGES
-                if (this.imageImport.file) {
-                    this.globalProgress.currentSection = 'Import des images...'
-                    this.addGlobalLog(`🖼️ Import des images depuis ZIP...`, 'info')
-                    
-                    currentOp++
-                    this.globalProgress.current = currentOp
-                    this.globalProgress.total = totalOps
-                    
-                    try {
-                        const zipResults = await importImagesFromZip(
-                            this.imageImport.file,
-                            (progress) => {
-                                // Progression interne du ZIP
-                            },
-                            (message, type) => {
-                                this.addGlobalLog(message, type)
-                            }
-                        )
+                if( this.isImportImage) 
+                {
+                    if (this.imageImport.file) {
+                        this.globalProgress.currentSection = 'Import des images...'
+                        this.addGlobalLog(`🖼️ Import des images depuis ZIP...`, 'info')
                         
-                        if (zipResults) {
-                            summary.images = zipResults.success?.length || 0
-                            summary.totalErrors += (zipResults.notFound?.length || 0) + (zipResults.errors?.length || 0)
-                            this.imageImport.results = zipResults
+                        currentOp++
+                        this.globalProgress.current = currentOp
+                        this.globalProgress.total = totalOps
+                        
+                        try {
+                            const zipResults = await importImagesFromZip(
+                                this.imageImport.file,
+                                (progress) => {
+                                    // Progression interne du ZIP
+                                },
+                                (message, type) => {
+                                    this.addGlobalLog(message, type)
+                                }
+                            )
+                            
+                            if (zipResults) {
+                                summary.images = zipResults.success?.length || 0
+                                summary.totalErrors += (zipResults.notFound?.length || 0) + (zipResults.errors?.length || 0)
+                                this.imageImport.results = zipResults
+                            }
+                        } catch (error) {
+                            const errorMsg = error instanceof Error ? error.message : String(error)
+                            this.addGlobalLog(`💥 Erreur import images: ${errorMsg}`, 'error')
+                            await this.rollbackCriticalResources(error)
+                            throw error
                         }
-                    } catch (error) {
-                        const errorMsg = error instanceof Error ? error.message : String(error)
-                        this.addGlobalLog(`💥 Erreur import images: ${errorMsg}`, 'error')
-                        await this.rollbackCriticalResources(error)
-                        throw error
                     }
                 }
 
@@ -972,7 +991,7 @@ export default {
                                     })
                                     if (reference) {
                                         await new Promise((r) => setTimeout(r, 800))
-                                        await ensureSimpleProductStock(reference, quantity)
+                                        // await ensureSimpleProductStock(reference, quantity)
                                     }
                                 } catch (stockErr) {
                                     console.warn(`Stock non créé ligne ${i + 1}:`, stockErr)

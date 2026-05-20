@@ -1,11 +1,11 @@
 
 -- savoir quel taux de TVA s'applique pour la France
 SELECT tr.*, t.rate, c.iso_code, cl.name AS country_name
-FROM ps_tax_rule tr
-JOIN ps_tax t ON tr.id_tax = t.id_tax
-LEFT JOIN ps_country c ON tr.id_country = c.id_country
-LEFT JOIN ps_country_lang cl ON c.id_country = cl.id_country AND cl.id_lang = 1
-WHERE tr.id_country = (SELECT id_country FROM ps_country WHERE iso_code = 'FR');
+FROM tax_rule tr
+JOIN tax t ON tr.id_tax = t.id_tax
+LEFT JOIN country c ON tr.id_country = c.id_country
+LEFT JOIN country_lang cl ON c.id_country = cl.id_country AND cl.id_lang = 1
+WHERE tr.id_country = (SELECT id_country FROM country WHERE iso_code = 'FR');
 
 
 
@@ -39,3 +39,31 @@ LEFT JOIN attribute_group ag ON a.id_attribute_group = ag.id_attribute_group
 LEFT JOIN attribute_group_lang agl ON ag.id_attribute_group = agl.id_attribute_group AND agl.id_lang = 1
 LEFT JOIN attribute_lang al ON a.id_attribute = al.id_attribute AND al.id_lang = 1
 WHERE pa.id_product = 1;
+
+SELECT SUM(od.product_quantity * p.wholesale_price),od.product_quantity,p.wholesale_price
+FROM order_detail od
+JOIN product p ON p.id_product = od.product_id
+JOIN orders o ON o.id_order = od.id_order
+JOIN order_state os ON os.id_order_state = o.current_state
+WHERE os.paid = 1
+
+
+
+SELECT id_order, reference, total_paid, total_paid_real
+FROM ps_orders
+WHERE total_paid_real <> total_paid
+ORDER BY id_order DESC
+LIMIT 100;
+
+SELECT * FROM ps_order_payment
+WHERE order_reference = 'ORDERREF';
+
+SELECT * FROM ps_order_payment
+WHERE id_order = 123;
+
+SELECT COUNT(*) AS cnt, SUM(amount) AS sum_payments,
+       GROUP_CONCAT(CONCAT(amount,' on ',date_add) SEPARATOR '; ') AS details
+FROM ps_order_payment
+WHERE order_reference = 'ORDERREF'
+GROUP BY order_reference;
+

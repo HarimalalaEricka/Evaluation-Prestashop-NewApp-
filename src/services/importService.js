@@ -65,7 +65,7 @@ function buildTaxRuleGroupXml(rateValue, languageIds = [1]) {
 }
 
 function buildTaxRuleXml({ groupId, taxId, countryId }) {
-    return `<?xml version="1.0" encoding="UTF-8"?>\n<prestashop xmlns:xlink="http://www.w3.org/1999/xlink">\n<tax_rule>\n<id_tax_rules_group><![CDATA[${groupId}]]></id_tax_rules_group>\n<id_state><![CDATA[1]]></id_state>\n<id_country><![CDATA[${countryId}]]></id_country>\n<zipcode_from><![CDATA[0]]></zipcode_from>\n<zipcode_to><![CDATA[0]]></zipcode_to>\n<id_tax><![CDATA[${taxId}]]></id_tax>\n<behavior><![CDATA[0]]></behavior>\n<description><![CDATA[]]></description>\n</tax_rule>\n</prestashop>`
+    return `<?xml version="1.0" encoding="UTF-8"?>\n<prestashop xmlns:xlink="http://www.w3.org/1999/xlink">\n<tax_rule>\n<id_tax_rules_group><![CDATA[${groupId}]]></id_tax_rules_group>\n<id_state><![CDATA[0]]></id_state>\n<id_country><![CDATA[${countryId}]]></id_country>\n<zipcode_from><![CDATA[0]]></zipcode_from>\n<zipcode_to><![CDATA[0]]></zipcode_to>\n<id_tax><![CDATA[${taxId}]]></id_tax>\n<behavior><![CDATA[0]]></behavior>\n<description><![CDATA[]]></description>\n</tax_rule>\n</prestashop>`
 }
 
 function extractCreatedId(xmlText) {
@@ -731,6 +731,8 @@ async function getOrderStateIdByName(stateName) {
     }
 
     const aliasMatches = (orderStateAliases[normalizedStateName] || []).map((alias) => normalizeLookupKey(alias))
+    console.log('[STATE] input:', cleanedStateName, '→ normalized:', normalizedStateName)
+    console.log('[STATE] aliases:', aliasMatches)
 
     try {
         const xmlDoc = await fetchXmlDocument('order_states?display=[id,name]')
@@ -748,6 +750,8 @@ async function getOrderStateIdByName(stateName) {
                 .filter(Boolean)
 
             const normalizedCandidates = candidateNames.map((candidateName) => normalizeLookupKey(candidateName))
+
+            console.log('[STATE] checking id:', id, 'candidates:', normalizedCandidates)
 
             if (
                 normalizedCandidates.includes(normalizedStateName)
@@ -1043,7 +1047,7 @@ export async function importCustomerOrders(rows, languageIds = [1]) {
     const taxRulesGroupRateLookup = await getTaxRulesGroupRateLookup()
     const defaultCurrencyId = await getDefaultCurrencyId()
     const defaultCarrierId = await getDefaultCarrierId()
-    const defaultCountryId = String(ID_COUNTRY ?? '').trim() || '0'
+    const defaultCountryId = await getDefaultTaxCountryId()
     const defaultLangId = String(languageIds?.[0] ?? DEFAULT_ID_LANG).trim() || DEFAULT_ID_LANG
 
     const customerCache = {}
@@ -1107,6 +1111,7 @@ export async function importCustomerOrders(rows, languageIds = [1]) {
                         dateAdd: orderDate,
                         idLang: defaultLangId,
                     })
+                    // console.log('[ORDERS] orderXml total_paid:', orderXml.match(/total_paid[^>]*>(.*?)<\/total_paid>/g))
                     const resp = await insertResourceData('customers', xml)
                     customerId = extractCreatedId(resp)
                     if (!customerId) throw new Error('Failed to create customer')
@@ -1190,16 +1195,22 @@ export async function importCustomerOrders(rows, languageIds = [1]) {
 
                     productAttributeId = String(combinationEntry?.id ?? '0').trim() || '0'
                     combinationPriceImpact = parseDecimalValue(combinationEntry?.price) ?? 0
+                    console.log(combinationPriceImpact)
                     lineLabel = `${productName} - ${item.variant}`
                 }
 
                 const unitPriceExcl = Math.round((basePrice + combinationPriceImpact) * 100) / 100
-                const unitPriceIncl = Math.round(unitPriceExcl * (1 + productTaxRate / 100) * 100) / 100
+                // Arrondir au 0.05 le plus proche pour éviter les écarts de centimes
+                const unitPriceInclRaw = unitPriceExcl * (1 + productTaxRate / 100)
+                const unitPriceIncl = Math.round(unitPriceInclRaw * 20) / 20  // arrondi au 0.05
+                console.log('[UNIT]', unitPriceIncl,productTaxRate)
                 const lineTotalExcl = Math.round(unitPriceExcl * item.quantity * 100) / 100
-                const lineTotalIncl = Math.round(unitPriceIncl * item.quantity * 100) / 100
+                const lineTotalIncl = Math.round(unitPriceIncl * item.quantity * 100) / 100  
+                console.log('[UNIT]', lineTotalExcl,lineTotalIncl, item.quantity)
 
                 totalProducts += lineTotalExcl
                 totalProductsWt += lineTotalIncl
+                console.log('[TOTAL]', totalProducts, totalProductsWt)
                 totalProducts = Math.round(totalProducts * 100) / 100
                 totalProductsWt = Math.round(totalProductsWt * 100) / 100
 
@@ -1220,6 +1231,29 @@ export async function importCustomerOrders(rows, languageIds = [1]) {
 
             if (cartRows.length === 0) throw new Error('No items to order')
             console.log(`[ORDERS] 4. Items processed: ${cartRows.length}, total: ${totalProductsWt.toFixed(2)}`)
+
+            const importedPaidAmount = parseDecimalValue(
+                rowLookup.montant
+                ?? rowLookup.amount
+                ?? rowLookup.total
+                ?? rowLookup.totalttc
+                ?? rowLookup.prixventettc
+            )
+
+            const finalTotalPaidIncl = Number.isFinite(importedPaidAmount)
+                ? Math.round(importedPaidAmount * 100) / 100
+                : Math.round(totalProductsWt * 100) / 100
+            const finalTotalPaidExcl = Math.round(totalProducts * 100) / 100
+            const finalTotalProductsWt = Math.round(totalProductsWt * 100) / 100
+            const finalTotalProductsExcl = Math.round(totalProducts * 100) / 100
+
+            console.log('[ORDERS] final totals', {
+                importedPaidAmount,
+                finalTotalPaidIncl,
+                finalTotalPaidExcl,
+                finalTotalProductsWt,
+                finalTotalProductsExcl,
+            })
 
             const secureKey = customerSecureKey
             const cartXml = buildCartXml({
@@ -1270,18 +1304,20 @@ export async function importCustomerOrders(rows, languageIds = [1]) {
                     idShop: DEFAULT_ID_SHOP || '1',
                     idShopGroup: DEFAULT_ID_SHOP_GROUP || '1',
                     currentState: currentStateId,
-                    payment: stateName || DEFAULT_ORDER_PAYMENT,
+                    payment: DEFAULT_ORDER_PAYMENT,
                     secureKey: secureKey,
                 },
                 orderRows,
                 {
-                    totalPaid: String(totalProductsWt),
-                    totalPaidTaxIncl: String(totalProductsWt),
-                    totalPaidTaxExcl: String(totalProducts),
-                    totalProducts: String(totalProducts),
-                    totalProductsWt: String(totalProductsWt),
+                    totalPaid: finalTotalPaidIncl.toFixed(2),
+                    totalPaidTaxIncl: finalTotalPaidIncl.toFixed(2),
+                    totalPaidTaxExcl: finalTotalPaidExcl.toFixed(2),
+                    totalPaidReal: finalTotalPaidIncl.toFixed(2),
+                    totalProducts: finalTotalProductsExcl.toFixed(2),
+                    totalProductsWt: finalTotalProductsWt.toFixed(2),
                 }
             )
+            console.log(orderXml)
             const orderResp = await insertResourceData('orders', orderXml)
             const orderId = extractCreatedId(orderResp)
             if (!orderId) {
@@ -1296,6 +1332,7 @@ export async function importCustomerOrders(rows, languageIds = [1]) {
             <order>
             <id><![CDATA[${orderId}]]></id>
             <date_add><![CDATA[${orderDate}]]></date_add>
+            <current_state><![CDATA[${currentStateId}]]></current_state>
             </order>
             </prestashop>`)
                 console.log(`[ORDERS]  date_add patched: ${orderDate}`)
@@ -1303,17 +1340,10 @@ export async function importCustomerOrders(rows, languageIds = [1]) {
                 console.warn(`[ORDERS]  date_add patch skipped:`, e.message)
             }
             
-            try {
-                const histXml = buildOrderHistoryXml({
-                    idOrder: orderId,
-                    idOrderState: currentStateId,
-                    dateAdd: orderDate,
-                })
-                await insertResourceData('order_histories', histXml)
-                console.log(`[ORDERS] 7. Order history created`)
-            } catch (e) {
-                console.warn(`[ORDERS] 7. Order history skipped:`, e.message)
-            }
+            
+            
+            // Do not add order_history manually here: validateOrder already creates history and
+            // can trigger payment side effects if we duplicate state transitions.
 
             // for (const orderRow of orderRows) {
             //     try {
@@ -1337,7 +1367,7 @@ export async function importCustomerOrders(rows, languageIds = [1]) {
             //         console.warn(`[ORDERS] 8. Stock decrement skipped for product ${orderRow.productId}:`, e.message)
             //     }
             // }
-
+            
             results.success++
             console.log(`[ORDERS] ✅ Row ${rowIndex + 1} SUCCESS - Order ${orderId}`)
 
@@ -1396,8 +1426,11 @@ export async function prepareVariantImportOperations(rows, languageIds = [1]) {
             continue
         }
 
-        const basePrice = parseDecimalValue(productEntry.price) ?? 0
         const productTaxRate = parseDecimalValue(taxRulesGroupRateLookup[productEntry.taxRulesGroupId]) ?? 0
+        console.log('[VARIANTS] productEntry keys:', Object.keys(productEntry))
+        console.log('[VARIANTS] productEntry:', productEntry)
+        console.log( '[VARIANTS] productEntry', taxRulesGroupRateLookup[productEntry.taxRulesGroupId])
+        const basePrice = (parseDecimalValue(productEntry.price) ?? 0) 
         const targetHt = priceTtc !== null ? (priceTtc / (1 + (productTaxRate / 100))) : basePrice
 
         if (!specificite && !karazany) {
@@ -1429,6 +1462,8 @@ export async function prepareVariantImportOperations(rows, languageIds = [1]) {
         }
 
         const priceImpact = String(Math.round(((targetHt - basePrice) + Number.EPSILON) * 1000000) / 1000000)
+        console.log(`[VARIANTS] Product ${reference} (ID: ${productId}) - Base price: ${basePrice}, Target HT: ${targetHt}, Price impact: ${priceImpact}, rate tax ${productTaxRate}%`)
+        // const priceImpact = String((targetHt))
         const isDefaultForProduct = !defaultCombinationAssigned[productId]
 
         if (isDefaultForProduct) {
@@ -1662,8 +1697,8 @@ export async function getTaxRulesGroupRateLookup() {
 
     try {
         ;[taxRulesDoc, taxesDoc] = await Promise.all([
-            fetchXmlDocument('tax_rules'),
-            fetchXmlDocument('taxes'),
+            fetchXmlDocument('tax_rules?display=full'),
+            fetchXmlDocument('taxes?display=full'),
         ])
     } catch {
         return lookup

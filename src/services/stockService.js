@@ -222,6 +222,33 @@ export async function updateStock(stock)
         throw error instanceof Error ? error : new Error(String(error))
     }
 }
+export async function updateQuantity(id_product, newQuantity, id_product_attribute, id_shop)
+{
+    if (newQuantity == null || isNaN(newQuantity)) throw new Error('newQuantity must be a valid number')
+
+    try {
+        const templateXml = await getRessourceItemXmlShemaBlank('update_stock')
+
+        const parser = new DOMParser()
+        const xmlDoc = parser.parseFromString(templateXml, 'application/xml')
+
+        const updateStockNode = xmlDoc.getElementsByTagName('update_stock')[0]
+        if (!updateStockNode) {
+            throw new Error('update_stock node introuvable dans le schéma retourné')
+        }
+        setOrCreateXmlField(updateStockNode, 'id_product', String(id_product), xmlDoc)
+        setOrCreateXmlField(updateStockNode, 'id_product_attribute', String(id_product_attribute || 0), xmlDoc)
+        setOrCreateXmlField(updateStockNode, 'id_shop', String(id_shop || 1), xmlDoc)
+        setOrCreateXmlField(updateStockNode, 'delta', String(newQuantity), xmlDoc)
+        
+        // POST au nouvel endpoint
+        const serializer = new XMLSerializer()
+        const finalXml = serializer.serializeToString(xmlDoc)
+        return await insertResourceData('update_stock', finalXml)
+    } catch (error) {
+        throw error instanceof Error ? error : new Error(String(error))
+    }
+}
 
 export async function getSummaryStockByIdProduct(id_product)
 {

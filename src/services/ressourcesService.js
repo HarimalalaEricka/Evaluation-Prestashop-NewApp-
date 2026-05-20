@@ -234,6 +234,8 @@ export async function deleteCriticalResourcesData() {
         { resourceName: 'order_histories', label: 'order_history' },
         { resourceName: 'products', label: 'products' },
         { resourceName: 'carts', label: 'carts' },
+        { resourceName: 'order_details', label: 'order_details' },
+        { resourceName: 'order_payments', label: 'order_payments' },
     ]
 
     const results = []
@@ -335,47 +337,75 @@ export async function getRessources() {
 
 // maka ny data anle ressource manokana (ohatra products, categories, etc)
 export async function getRessourceData(ressourceName, options = {}) {
-    const controller = new AbortController()
-    const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
-    const queryParams = buildCollectionQueryParams(options)
-    const queryString = queryParams.toString()
-
-    let res
-
-    try {
-        res = await fetch(queryString ? `${BASE_URL}/${ressourceName}?${queryString}` : `${BASE_URL}/${ressourceName}`, {
-        // ito le manome authorization header raha misy API key, raha tsy misy dia tsy asiana
-        headers: {
-            ...getAuthHeaders(),
-        },
-        signal: controller.signal,
-        })
-    } catch (error) {
-        if (error.name === 'AbortError') {
-        throw new Error('Timeout API')
-        }
-
-        throw new Error('Erreur réseau API')
-    } finally {
-        window.clearTimeout(timeoutId)
-    }
-
-    if (!res.ok) throw new Error(getHttpErrorMessage(res.status))
-
-    const xmlText = await res.text()
-    const parser = new DOMParser()
-    const xmlDoc = parser.parseFromString(xmlText, 'application/xml')
-
-    if (xmlDoc.documentElement.nodeName === 'parsererror') {
-        throw new Error('Erreur parsing XML')
-    }
-
-    // Singulariser le nom de ressource (categories → category, products → product, etc)
     const itemTagName = singularizeResourceName(ressourceName)
 
-    const result = parseResourcesFromXml(xmlDoc, 'prestashop', itemTagName)
-    
-    return result
+    const fetchPage = async (queryOptions = {}) => {
+        const controller = new AbortController()
+        const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+        const queryParams = buildCollectionQueryParams(queryOptions)
+        const queryString = queryParams.toString()
+
+        let res
+
+        try {
+            res = await fetch(queryString ? `${BASE_URL}/${ressourceName}?${queryString}` : `${BASE_URL}/${ressourceName}`, {
+                headers: {
+                    ...getAuthHeaders(),
+                },
+                signal: controller.signal,
+            })
+        } catch (error) {
+            if (error.name === 'AbortError') {
+                throw new Error('Timeout API')
+            }
+
+            throw new Error('Erreur réseau API')
+        } finally {
+            window.clearTimeout(timeoutId)
+        }
+
+        if (!res.ok) throw new Error(getHttpErrorMessage(res.status))
+
+        const xmlText = await res.text()
+        const parser = new DOMParser()
+        const xmlDoc = parser.parseFromString(xmlText, 'application/xml')
+
+        if (xmlDoc.documentElement.nodeName === 'parsererror') {
+            throw new Error('Erreur parsing XML')
+        }
+
+        return parseResourcesFromXml(xmlDoc, 'prestashop', itemTagName)
+    }
+
+    const hasExplicitPagination = Number(options.page ?? 0) > 0 || Number(options.perPage ?? 0) > 0 || Number(options.limit ?? 0) > 0
+
+    if (hasExplicitPagination) {
+        return await fetchPage(options)
+    }
+
+    const perPage = 100
+    const maxPages = 200
+    const allItems = []
+
+    for (let page = 1; page <= maxPages; page += 1) {
+        const pageItems = await fetchPage({
+            ...options,
+            page,
+            perPage,
+        })
+
+        if (!Array.isArray(pageItems) || pageItems.length === 0) {
+            break
+        }
+
+        allItems.push(...pageItems)
+
+        if (pageItems.length < perPage) {
+            break
+        }
+    }
+
+    return allItems
 }
 
 // récupérer le schéma (structure) d'une ressource via ?schema=blank
